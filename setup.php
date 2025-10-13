@@ -1,7 +1,5 @@
 <?php
-// Na Porta - Database Setup Script
-// Run this file once to set up the database
-
+// Na Porta - Database Setup Script (Fixed Version)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -28,138 +26,140 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$database", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
-    // Check if tables exist
-    $tables_exist = false;
+    // Check if admin user exists
+    $admin_exists = false;
     try {
-        $result = $pdo->query("SHOW TABLES LIKE 'users'");
-        $tables_exist = $result->rowCount() > 0;
+        $result = $pdo->query("SELECT COUNT(*) FROM admin_users WHERE username = 'admin'");
+        $admin_exists = $result->fetchColumn() > 0;
     } catch (Exception $e) {
-        $tables_exist = false;
+        // Table doesn't exist yet
+        $admin_exists = false;
     }
     
-    if (!$tables_exist) {
-        // Read and execute schema
-        $schema = file_get_contents(__DIR__ . '/database/schema.sql');
+    if (!$admin_exists) {
+        // Create basic tables if they don't exist
         
-        if ($schema) {
-            // Split by semicolon and execute each statement
-            $statements = explode(';', $schema);
-            
-            foreach ($statements as $statement) {
-                $statement = trim($statement);
-                if (!empty($statement)) {
-                    try {
-                        $pdo->exec($statement);
-                    } catch (Exception $e) {
-                        // Skip if table already exists
-                        if (strpos($e->getMessage(), 'already exists') === false) {
-                            throw $e;
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        echo "<p>⚠️ Database tables already exist - skipping schema creation</p>";
-    }
+        // Users table
+        $pdo->exec("CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            cpf VARCHAR(14) UNIQUE,
+            phone VARCHAR(20),
+            birth_date DATE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE,
+            email_verified BOOLEAN DEFAULT FALSE,
+            verification_token VARCHAR(255),
+            reset_token VARCHAR(255),
+            reset_token_expires TIMESTAMP NULL
+        )");
         
-        echo "<p>✅ Database schema imported successfully</p>";
+        // Admin users table
+        $pdo->exec("CREATE TABLE IF NOT EXISTS admin_users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            role ENUM('super_admin', 'manager', 'editor') DEFAULT 'editor',
+            name VARCHAR(100) NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP NULL
+        )");
         
-        // Add some sample products
-        $sampleProducts = [
-            [
-                'category_id' => 1, // Água
-                'name' => 'Água Mineral 20L',
-                'slug' => 'agua-mineral-20l',
-                'description' => 'Água mineral natural de fonte, galão de 20 litros para sua casa ou escritório.',
-                'short_description' => 'Água mineral natural 20L',
-                'price' => 15.90,
-                'sku' => 'AGUA-20L-001',
-                'stock_quantity' => 50,
-                'is_featured' => 1
-            ],
-            [
-                'category_id' => 2, // Gás
-                'name' => 'Botijão de Gás 13kg',
-                'slug' => 'botijao-gas-13kg',
-                'description' => 'Botijão de gás de cozinha 13kg, ideal para uso doméstico.',
-                'short_description' => 'Botijão de gás 13kg',
-                'price' => 85.00,
-                'sku' => 'GAS-13KG-001',
-                'stock_quantity' => 25,
-                'is_featured' => 1
-            ],
-            [
-                'category_id' => 3, // Limpeza
-                'name' => 'Kit Limpeza Completo',
-                'slug' => 'kit-limpeza-completo',
-                'description' => 'Kit completo com produtos de limpeza: detergente, desinfetante, álcool gel e panos.',
-                'short_description' => 'Kit limpeza completo',
-                'price' => 45.50,
-                'sku' => 'LIMP-KIT-001',
-                'stock_quantity' => 30,
-                'is_featured' => 1
-            ],
-            [
-                'category_id' => 4, // Mercearia
-                'name' => 'Cesta Básica Familiar',
-                'slug' => 'cesta-basica-familiar',
-                'description' => 'Cesta básica completa com arroz, feijão, óleo, açúcar e outros itens essenciais.',
-                'short_description' => 'Cesta básica familiar',
-                'price' => 120.00,
-                'sku' => 'MERC-CESTA-001',
-                'stock_quantity' => 15,
-                'is_featured' => 1
-            ]
+        // Categories table
+        $pdo->exec("CREATE TABLE IF NOT EXISTS categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            slug VARCHAR(100) UNIQUE NOT NULL,
+            description TEXT,
+            image VARCHAR(255),
+            is_active BOOLEAN DEFAULT TRUE,
+            sort_order INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+        
+        // Products table
+        $pdo->exec("CREATE TABLE IF NOT EXISTS products (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category_id INT NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            slug VARCHAR(200) UNIQUE NOT NULL,
+            description TEXT,
+            short_description VARCHAR(500),
+            price DECIMAL(10,2) NOT NULL,
+            compare_price DECIMAL(10,2),
+            sku VARCHAR(100) UNIQUE,
+            stock_quantity INT DEFAULT 0,
+            min_stock_level INT DEFAULT 5,
+            weight DECIMAL(8,3),
+            dimensions VARCHAR(50),
+            is_active BOOLEAN DEFAULT TRUE,
+            is_featured BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+        )");
+        
+        echo "<p>✅ Basic tables created</p>";
+        
+        // Insert default admin user
+        $admin_password = password_hash('admin123', PASSWORD_DEFAULT);
+        $pdo->prepare("INSERT INTO admin_users (username, email, password, role, name) VALUES (?, ?, ?, ?, ?)")
+            ->execute(['admin', 'admin@naporta.com', $admin_password, 'super_admin', 'Administrator']);
+        
+        echo "<p>✅ Admin user created</p>";
+        
+        // Insert default categories
+        $categories = [
+            ['Água', 'agua', 'Água mineral e galões'],
+            ['Gás', 'gas', 'Botijões de gás de cozinha'],
+            ['Limpeza', 'limpeza', 'Produtos de limpeza doméstica'],
+            ['Mercearia', 'mercearia', 'Itens básicos de mercearia']
         ];
         
-        $stmt = $pdo->prepare("
-            INSERT INTO products (category_id, name, slug, description, short_description, price, sku, stock_quantity, is_featured, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-        ");
-        
-        foreach ($sampleProducts as $product) {
-            $stmt->execute([
-                $product['category_id'],
-                $product['name'],
-                $product['slug'],
-                $product['description'],
-                $product['short_description'],
-                $product['price'],
-                $product['sku'],
-                $product['stock_quantity'],
-                $product['is_featured']
-            ]);
+        $stmt = $pdo->prepare("INSERT INTO categories (name, slug, description, is_active, sort_order) VALUES (?, ?, ?, 1, ?)");
+        foreach ($categories as $index => $category) {
+            $stmt->execute([$category[0], $category[1], $category[2], $index + 1]);
         }
         
-        echo "<p>✅ Sample products added</p>";
+        echo "<p>✅ Default categories created</p>";
         
-        echo "<div style='background: #d4edda; padding: 20px; border-radius: 5px; margin: 20px 0;'>";
-        echo "<h3>🎉 Setup Complete!</h3>";
-        echo "<p><strong>Your Na Porta e-commerce platform is ready!</strong></p>";
-        echo "<p><a href='pages/home.php' style='background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Visit Homepage</a></p>";
-        echo "<p><a href='admin/login.php' style='background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Admin Panel</a></p>";
-        echo "<p><strong>Admin Credentials:</strong><br>";
-        echo "Username: <code>admin</code><br>";
-        echo "Password: <code>admin123</code></p>";
-        echo "<p><em>Remember to change the admin password after first login!</em></p>";
-        echo "</div>";
+        // Insert sample products
+        $products = [
+            [1, 'Água Mineral 20L', 'agua-mineral-20l', 'Água mineral natural 20L', 15.90, 'AGUA-001', 50, 1],
+            [2, 'Botijão de Gás 13kg', 'botijao-gas-13kg', 'Botijão de gás 13kg', 85.00, 'GAS-001', 25, 1],
+            [3, 'Kit Limpeza Completo', 'kit-limpeza-completo', 'Kit limpeza completo', 45.50, 'LIMP-001', 30, 1],
+            [4, 'Cesta Básica Familiar', 'cesta-basica-familiar', 'Cesta básica familiar', 120.00, 'MERC-001', 15, 1]
+        ];
         
-        echo "<p><strong>Next Steps:</strong></p>";
-        echo "<ul>";
-        echo "<li>Delete this setup.php file for security</li>";
-        echo "<li>Update config/config.php with your settings</li>";
-        echo "<li>Set up payment gateway credentials</li>";
-        echo "<li>Configure email settings</li>";
-        echo "<li>Add your products and categories</li>";
-        echo "</ul>";
+        $stmt = $pdo->prepare("INSERT INTO products (category_id, name, slug, short_description, price, sku, stock_quantity, is_featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        foreach ($products as $product) {
+            $stmt->execute($product);
+        }
+        
+        echo "<p>✅ Sample products created</p>";
         
     } else {
-        throw new Exception("Could not read schema file");
+        echo "<p>⚠️ Database already set up - skipping initialization</p>";
     }
     
+    echo "<div style='background: #d4edda; padding: 20px; border-radius: 5px; margin: 20px 0;'>";
+    echo "<h3>🎉 Setup Complete!</h3>";
+    echo "<p><strong>Your Na Porta e-commerce platform is ready!</strong></p>";
+    echo "<p><a href='simple-home.php' style='background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Visit Simple Homepage</a></p>";
+    echo "<p><a href='pages/home.php' style='background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Visit Full Homepage</a></p>";
+    echo "<p><a href='admin/login.php' style='background: #6f42c1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Admin Panel</a></p>";
+    echo "<p><strong>Admin Credentials:</strong><br>";
+    echo "Username: <code>admin</code><br>";
+    echo "Password: <code>admin123</code></p>";
+    echo "</div>";
+    
 } catch (Exception $e) {
-    echo "<p style='color: red;'>❌ Error: " . $e->getMessage() . "</p>";
+    echo "<p style='color: red;'>❌ Error: " . htmlspecialchars($e->getMessage()) . "</p>";
     echo "<p>Please check your database configuration and try again.</p>";
 }
 ?>
@@ -190,11 +190,5 @@ code {
     padding: 2px 6px;
     border-radius: 3px;
     font-family: monospace;
-}
-
-ul {
-    background: white;
-    padding: 20px;
-    border-radius: 5px;
 }
 </style>

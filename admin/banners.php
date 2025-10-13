@@ -173,7 +173,7 @@ try {
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="index-fixed.php">
+            <a class="navbar-brand" href="index.php">
                 <i class="fas fa-home me-2"></i>Admin Na Porta
             </a>
             
@@ -193,7 +193,7 @@ try {
             <!-- Sidebar -->
             <div class="col-md-2">
                 <div class="list-group">
-                    <a href="index-fixed.php" class="list-group-item list-group-item-action">
+                    <a href="index.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-dashboard me-2"></i>Dashboard
                     </a>
                     <a href="banners.php" class="list-group-item list-group-item-action active">

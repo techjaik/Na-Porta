@@ -205,7 +205,7 @@ $page_title = 'Pedidos';
         
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a class="nav-link" href="index-fixed.php">
+                <a class="nav-link" href="index.php">
                     <i class="fas fa-tachometer-alt me-2"></i>Dashboard
                 </a>
             </li>
