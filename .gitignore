@@ -3,9 +3,9 @@
 .env.local
 .env.production
 
-# Database backups
-*.sql
+# Database backups (but allow database_export.sql)
 database/backups/
+!database_export.sql
 
 # Uploads directory (if contains user uploads)
 uploads/*
