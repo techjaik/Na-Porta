@@ -1,0 +1,37 @@
+# Environment files
+.env
+.env.local
+.env.production
+
+# Database backups
+*.sql
+database/backups/
+
+# Uploads directory (if contains user uploads)
+uploads/*
+!uploads/.gitkeep
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# PHP specific
+vendor/
+composer.lock (if using composer)
+
+# Sensitive configuration (if any)
+config/local.php
