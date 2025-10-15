@@ -10,6 +10,36 @@ $auth = new Auth();
 $db = Database::getInstance();
 $user = $auth->getCurrentUser();
 
+// Ensure order tables exist
+try {
+    $pdo = $db->getConnection();
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS orders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            total_amount DECIMAL(10,2) NOT NULL,
+            delivery_address TEXT NOT NULL,
+            payment_method VARCHAR(50) NOT NULL,
+            status VARCHAR(20) DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS order_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            product_id INT NOT NULL,
+            quantity INT NOT NULL,
+            price DECIMAL(10,2) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+} catch (Exception $e) {
+    error_log("Error creating order tables: " . $e->getMessage());
+}
+
 // Redirect to login if not authenticated
 if (!$user) {
     header('Location: auth/login.php?redirect=checkout.php');
@@ -21,11 +51,29 @@ $error = '';
 
 // Handle order submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
-    $address = trim($_POST['address'] ?? '');
-    $payment_method = $_POST['payment_method'] ?? '';
-    
-    if (empty($address) || empty($payment_method)) {
-        $error = 'Por favor, preencha todos os campos obrigatórios.';
+    // Get address from multiple possible sources
+    $address = trim($_POST['address'] ?? $_POST['combined_address'] ?? '');
+    $street = trim($_POST['street'] ?? '');
+    $cep = trim($_POST['cep'] ?? '');
+    $neighborhood = trim($_POST['neighborhood'] ?? '');
+    $city = trim($_POST['city'] ?? '');
+    $state = trim($_POST['state'] ?? '');
+    $complement = trim($_POST['complement'] ?? '');
+
+    // If no combined address, build it from individual fields
+    if (empty($address) && !empty($street)) {
+        $address = $street;
+        if (!empty($complement)) $address .= ', ' . $complement;
+        if (!empty($neighborhood)) $address .= ', ' . $neighborhood;
+        if (!empty($city)) $address .= ', ' . $city;
+        if (!empty($state)) $address .= ' - ' . $state;
+        if (!empty($cep)) $address .= ', CEP: ' . $cep;
+    }
+
+    $payment_method = $_POST['payment_method'] ?? 'cash';
+
+    if (empty($address)) {
+        $error = 'Por favor, preencha o endereço de entrega.';
     } else {
         try {
             // Get cart items for both logged-in users and sessions
@@ -79,9 +127,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                     $db->query("DELETE FROM cart_items WHERE session_id = ?", [$sessionId]);
                 }
                 
-                // Redirect to success page
-                header('Location: order-success.php?order=' . $orderId);
-                exit();
+                // Set success message instead of redirect for now
+                $success = "Pedido #$orderId criado com sucesso! Total: R$ " . number_format($total, 2, ',', '.') . " - Endereço: " . $address;
+
+                // Uncomment this line when order-success.php is ready
+                // header('Location: order-success.php?order=' . $orderId);
+                // exit();
             }
         } catch (Exception $e) {
             $error = 'Erro ao processar pedido: ' . $e->getMessage();
@@ -275,6 +326,13 @@ if (empty($cartItems)) {
     <!-- Checkout Content -->
     <section class="py-5">
         <div class="container">
+            <?php if ($success): ?>
+                <div class="alert alert-success alert-dismissible fade show">
+                    <i class="fas fa-check-circle me-2"></i><?= htmlspecialchars($success) ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+
             <?php if ($error): ?>
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-triangle me-2"></i><?= htmlspecialchars($error) ?>
