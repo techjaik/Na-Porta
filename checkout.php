@@ -28,13 +28,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
         $error = 'Por favor, preencha todos os campos obrigatórios.';
     } else {
         try {
-            // Get cart items
-            $cartItems = $db->fetchAll("
-                SELECT ci.*, p.name, p.price
-                FROM cart_items ci
-                JOIN products p ON ci.product_id = p.id
-                WHERE ci.user_id = ? AND p.is_active = 1
-            ", [$user['id']]);
+            // Get cart items for both logged-in users and sessions
+            if ($user) {
+                $cartItems = $db->fetchAll("
+                    SELECT ci.*, p.name, p.price
+                    FROM cart_items ci
+                    JOIN products p ON ci.product_id = p.id
+                    WHERE ci.user_id = ? AND p.is_active = 1
+                ", [$user['id']]);
+            } else {
+                $sessionId = session_id();
+                $cartItems = $db->fetchAll("
+                    SELECT ci.*, p.name, p.price
+                    FROM cart_items ci
+                    JOIN products p ON ci.product_id = p.id
+                    WHERE ci.session_id = ? AND p.is_active = 1
+                ", [$sessionId]);
+            }
             
             if (empty($cartItems)) {
                 $error = 'Seu carrinho está vazio.';
@@ -61,8 +71,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                     ", [$orderId, $item['product_id'], $item['quantity'], $item['price']]);
                 }
                 
-                // Clear cart
-                $db->query("DELETE FROM cart_items WHERE user_id = ?", [$user['id']]);
+                // Clear cart for both user types
+                if ($user) {
+                    $db->query("DELETE FROM cart_items WHERE user_id = ?", [$user['id']]);
+                } else {
+                    $sessionId = session_id();
+                    $db->query("DELETE FROM cart_items WHERE session_id = ?", [$sessionId]);
+                }
                 
                 // Redirect to success page
                 header('Location: order-success.php?order=' . $orderId);
@@ -74,17 +89,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
     }
 }
 
-// Get cart items for display
+// Get cart items for display (support both user types)
 $cartItems = [];
 $cartTotal = 0;
 try {
-    $cartItems = $db->fetchAll("
-        SELECT ci.*, p.name, p.price, p.image
-        FROM cart_items ci
-        JOIN products p ON ci.product_id = p.id
-        WHERE ci.user_id = ? AND p.is_active = 1
-    ", [$user['id']]);
-    
+    if ($user) {
+        $cartItems = $db->fetchAll("
+            SELECT ci.*, p.name, p.price, p.image_url as image
+            FROM cart_items ci
+            JOIN products p ON ci.product_id = p.id
+            WHERE ci.user_id = ? AND p.is_active = 1
+        ", [$user['id']]);
+    } else {
+        $sessionId = session_id();
+        $cartItems = $db->fetchAll("
+            SELECT ci.*, p.name, p.price, p.image_url as image
+            FROM cart_items ci
+            JOIN products p ON ci.product_id = p.id
+            WHERE ci.session_id = ? AND p.is_active = 1
+        ", [$sessionId]);
+    }
+
     foreach ($cartItems as $item) {
         $cartTotal += $item['price'] * $item['quantity'];
     }
@@ -149,6 +174,49 @@ if (empty($cartItems)) {
             border-radius: var(--border-radius);
             box-shadow: var(--shadow-md);
             border: none;
+        }
+
+        .payment-methods {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .payment-option {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .payment-option:hover {
+            border-color: var(--primary-color);
+            background-color: #f8faff;
+        }
+
+        .payment-option.recommended {
+            border-color: var(--success-color);
+            background-color: #f0fdf4;
+        }
+
+        .payment-option input[type="radio"]:checked + label {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .payment-option.recommended input[type="radio"]:checked + label {
+            color: var(--success-color);
+        }
+
+        .form-check-input:checked {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .payment-option.recommended .form-check-input:checked {
+            background-color: var(--success-color);
+            border-color: var(--success-color);
         }
         
         .btn-primary {
@@ -224,47 +292,120 @@ if (empty($cartItems)) {
                         <form method="POST">
                             <input type="hidden" name="place_order" value="1">
                             
-                            <div class="mb-3">
-                                <label class="form-label">Endereço Completo *</label>
-                                <textarea name="address" class="form-control" rows="3" required 
-                                          placeholder="Rua, número, complemento, bairro, cidade, CEP"></textarea>
+                            <div class="mb-4">
+                                <h6 class="mb-3">
+                                    <i class="fas fa-map-marker-alt me-2"></i>Endereço de Entrega
+                                </h6>
+
+                                <div class="row">
+                                    <div class="col-md-8 mb-3">
+                                        <label class="form-label">Rua e Número *</label>
+                                        <input type="text" name="street" class="form-control" required
+                                               placeholder="Ex: Rua das Flores, 123">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">CEP *</label>
+                                        <input type="text" name="cep" class="form-control" required
+                                               placeholder="00000-000" maxlength="9">
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Bairro *</label>
+                                        <input type="text" name="neighborhood" class="form-control" required
+                                               placeholder="Ex: Centro">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Complemento</label>
+                                        <input type="text" name="complement" class="form-control"
+                                               placeholder="Ex: Apto 101, Bloco A">
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-8 mb-3">
+                                        <label class="form-label">Cidade *</label>
+                                        <input type="text" name="city" class="form-control" required
+                                               placeholder="Ex: São Paulo">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Estado *</label>
+                                        <select name="state" class="form-control" required>
+                                            <option value="">Selecione...</option>
+                                            <option value="AC">Acre</option>
+                                            <option value="AL">Alagoas</option>
+                                            <option value="AP">Amapá</option>
+                                            <option value="AM">Amazonas</option>
+                                            <option value="BA">Bahia</option>
+                                            <option value="CE">Ceará</option>
+                                            <option value="DF">Distrito Federal</option>
+                                            <option value="ES">Espírito Santo</option>
+                                            <option value="GO">Goiás</option>
+                                            <option value="MA">Maranhão</option>
+                                            <option value="MT">Mato Grosso</option>
+                                            <option value="MS">Mato Grosso do Sul</option>
+                                            <option value="MG">Minas Gerais</option>
+                                            <option value="PA">Pará</option>
+                                            <option value="PB">Paraíba</option>
+                                            <option value="PR">Paraná</option>
+                                            <option value="PE">Pernambuco</option>
+                                            <option value="PI">Piauí</option>
+                                            <option value="RJ">Rio de Janeiro</option>
+                                            <option value="RN">Rio Grande do Norte</option>
+                                            <option value="RS">Rio Grande do Sul</option>
+                                            <option value="RO">Rondônia</option>
+                                            <option value="RR">Roraima</option>
+                                            <option value="SC">Santa Catarina</option>
+                                            <option value="SP" selected>São Paulo</option>
+                                            <option value="SE">Sergipe</option>
+                                            <option value="TO">Tocantins</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Hidden field to combine address for database -->
+                                <input type="hidden" name="address" id="combined_address">
                             </div>
                             
                             <div class="mb-4">
                                 <label class="form-label">Forma de Pagamento *</label>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="payment_method" 
-                                                   value="dinheiro" id="dinheiro" required>
-                                            <label class="form-check-label" for="dinheiro">
-                                                <i class="fas fa-money-bill-wave me-2"></i>Dinheiro
-                                            </label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="payment_method" 
-                                                   value="cartao_debito" id="cartao_debito">
-                                            <label class="form-check-label" for="cartao_debito">
-                                                <i class="fas fa-credit-card me-2"></i>Cartão de Débito
-                                            </label>
-                                        </div>
+                                <div class="payment-methods">
+                                    <div class="form-check payment-option recommended">
+                                        <input class="form-check-input" type="radio" name="payment_method"
+                                               value="dinheiro" id="dinheiro" required checked>
+                                        <label class="form-check-label" for="dinheiro">
+                                            <i class="fas fa-money-bill-wave me-2 text-success"></i>
+                                            <strong>Dinheiro (Recomendado)</strong>
+                                            <small class="d-block text-muted">Pagamento na entrega</small>
+                                        </label>
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="payment_method" 
-                                                   value="cartao_credito" id="cartao_credito">
-                                            <label class="form-check-label" for="cartao_credito">
-                                                <i class="fas fa-credit-card me-2"></i>Cartão de Crédito
-                                            </label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="payment_method" 
-                                                   value="pix" id="pix">
-                                            <label class="form-check-label" for="pix">
-                                                <i class="fas fa-qrcode me-2"></i>PIX
-                                            </label>
-                                        </div>
+
+                                    <div class="form-check payment-option">
+                                        <input class="form-check-input" type="radio" name="payment_method"
+                                               value="cartao_debito" id="cartao_debito">
+                                        <label class="form-check-label" for="cartao_debito">
+                                            <i class="fas fa-credit-card me-2 text-primary"></i>
+                                            <strong>Cartão de Débito</strong>
+                                            <small class="d-block text-muted">Pagamento na entrega</small>
+                                        </label>
                                     </div>
+
+                                    <div class="form-check payment-option">
+                                        <input class="form-check-input" type="radio" name="payment_method"
+                                               value="pix" id="pix">
+                                        <label class="form-check-label" for="pix">
+                                            <i class="fas fa-qrcode me-2 text-info"></i>
+                                            <strong>PIX</strong>
+                                            <small class="d-block text-muted">Pagamento na entrega</small>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-info mt-3">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Importante:</strong> Todos os pagamentos são realizados na entrega.
+                                    Tenha o valor exato ou cartão em mãos.
                                 </div>
                             </div>
                             
@@ -332,5 +473,56 @@ if (empty($cartItems)) {
     </section>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Combine address fields before form submission
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const street = document.querySelector('input[name="street"]').value;
+            const cep = document.querySelector('input[name="cep"]').value;
+            const neighborhood = document.querySelector('input[name="neighborhood"]').value;
+            const complement = document.querySelector('input[name="complement"]').value;
+            const city = document.querySelector('input[name="city"]').value;
+            const state = document.querySelector('select[name="state"]').value;
+
+            // Combine all address fields
+            let fullAddress = street;
+            if (complement) fullAddress += ', ' + complement;
+            fullAddress += ', ' + neighborhood;
+            fullAddress += ', ' + city + ' - ' + state;
+            fullAddress += ', CEP: ' + cep;
+
+            // Set the combined address
+            document.getElementById('combined_address').value = fullAddress;
+        });
+
+        // Format CEP input
+        document.querySelector('input[name="cep"]').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 5) {
+                value = value.substring(0, 5) + '-' + value.substring(5, 8);
+            }
+            e.target.value = value;
+        });
+
+        // Payment method selection styling
+        document.querySelectorAll('input[name="payment_method"]').forEach(function(radio) {
+            radio.addEventListener('change', function() {
+                // Remove active class from all options
+                document.querySelectorAll('.payment-option').forEach(function(option) {
+                    option.classList.remove('active');
+                });
+
+                // Add active class to selected option
+                this.closest('.payment-option').classList.add('active');
+            });
+        });
+
+        // Auto-select cash payment (already checked in HTML)
+        document.addEventListener('DOMContentLoaded', function() {
+            const cashOption = document.querySelector('#dinheiro');
+            if (cashOption && cashOption.checked) {
+                cashOption.closest('.payment-option').classList.add('active');
+            }
+        });
+    </script>
 </body>
 </html>
