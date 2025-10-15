@@ -1,0 +1,27 @@
+# Admin Directory Configuration
+DirectoryIndex index.php
+
+# Enable URL rewriting
+RewriteEngine On
+
+# Redirect /admin/ to /admin/index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^$ index.php [L]
+
+# Security: Block access to sensitive files
+<Files "*.sql">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "*.log">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# PHP settings for admin panel
+php_value max_execution_time 300
+php_value memory_limit 256M
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
