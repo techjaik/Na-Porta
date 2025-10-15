@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = trim($_POST['description'] ?? '');
         $price = floatval($_POST['price'] ?? 0);
         $category_id = intval($_POST['category_id'] ?? 0);
+        $image_source = $_POST['image_source'] ?? 'url';
         $image_url = trim($_POST['image_url'] ?? '');
         $is_featured = isset($_POST['is_featured']) ? 1 : 0;
         $is_active = isset($_POST['is_active']) ? 1 : 0;
@@ -32,14 +33,117 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($name) || $price <= 0 || $category_id <= 0) {
             $error = "Por favor, preencha todos os campos obrigatórios.";
         } else {
+            $file_path = '';
+
             try {
+                // Handle image upload or URL
+                if ($image_source === 'upload' && isset($_FILES['image_file'])) {
+                    // Check if file was actually uploaded
+                    if (empty($_FILES['image_file']['name'])) {
+                        throw new Exception('Nenhum arquivo foi selecionado para upload.');
+                    }
+
+                    // Check for upload errors
+                    $upload_error = $_FILES['image_file']['error'];
+                    if ($upload_error !== UPLOAD_ERR_OK) {
+                        $error_messages = [
+                            UPLOAD_ERR_INI_SIZE => 'Arquivo muito grande (limite do servidor).',
+                            UPLOAD_ERR_FORM_SIZE => 'Arquivo muito grande (limite do formulário).',
+                            UPLOAD_ERR_PARTIAL => 'Upload incompleto.',
+                            UPLOAD_ERR_NO_FILE => 'Nenhum arquivo selecionado.',
+                            UPLOAD_ERR_NO_TMP_DIR => 'Diretório temporário não encontrado.',
+                            UPLOAD_ERR_CANT_WRITE => 'Erro de escrita no disco.',
+                            UPLOAD_ERR_EXTENSION => 'Upload bloqueado por extensão.'
+                        ];
+                        throw new Exception($error_messages[$upload_error] ?? 'Erro desconhecido no upload.');
+                    }
+
+                    // File validation
+                    $upload_dir = __DIR__ . '/../uploads/products/';
+                    if (!is_dir($upload_dir)) {
+                        mkdir($upload_dir, 0755, true);
+                    }
+
+                    $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                    $max_size = 5 * 1024 * 1024; // 5MB
+
+                    $file_info = $_FILES['image_file'];
+                    $file_type = $file_info['type'];
+                    $file_size = $file_info['size'];
+                    $file_tmp_name = $file_info['tmp_name'];
+
+                    // Additional validation for file type using file extension
+                    $file_extension = strtolower(pathinfo($file_info['name'], PATHINFO_EXTENSION));
+                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+                    if (!in_array($file_extension, $allowed_extensions)) {
+                        throw new Exception('Extensão de arquivo não permitida. Use JPG, PNG, GIF ou WebP.');
+                    }
+
+                    if (!in_array($file_type, $allowed_types)) {
+                        throw new Exception('Tipo de arquivo não permitido. Use JPG, PNG, GIF ou WebP.');
+                    }
+
+                    if ($file_size > $max_size) {
+                        throw new Exception('Arquivo muito grande. Tamanho máximo: 5MB.');
+                    }
+
+                    // Validate that the uploaded file is actually an image
+                    if (!getimagesize($file_tmp_name)) {
+                        throw new Exception('O arquivo enviado não é uma imagem válida.');
+                    }
+
+                    // Generate unique filename
+                    $filename = 'product_' . time() . '_' . uniqid() . '.' . $file_extension;
+                    $file_path = 'uploads/products/' . $filename;
+                    $full_path = $upload_dir . $filename;
+
+                    // Attempt to move the uploaded file
+                    if (!move_uploaded_file($file_tmp_name, $full_path)) {
+                        // More detailed error message
+                        $error_details = error_get_last();
+                        $error_msg = 'Erro ao fazer upload do arquivo.';
+                        if ($error_details) {
+                            $error_msg .= ' Detalhes: ' . $error_details['message'];
+                        }
+                        throw new Exception($error_msg);
+                    }
+
+                    // Verify the file was actually created
+                    if (!file_exists($full_path)) {
+                        throw new Exception('Arquivo não foi salvo corretamente no servidor.');
+                    }
+                } elseif ($image_source === 'url' && !empty($image_url)) {
+                    // URL input
+                    if (!filter_var($image_url, FILTER_VALIDATE_URL)) {
+                        throw new Exception('URL da imagem inválida.');
+                    }
+                    $file_path = $image_url;
+                } else {
+                    // No file uploaded and no URL provided
+                    if ($image_source === 'upload') {
+                        throw new Exception('Por favor, selecione um arquivo para upload.');
+                    } else {
+                        throw new Exception('Por favor, forneça uma URL válida para a imagem.');
+                    }
+                }
+
+                // Ensure we have a file path before inserting
+                if (empty($file_path)) {
+                    throw new Exception('Caminho do arquivo não foi definido corretamente.');
+                }
+
                 $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name)));
-                
+
                 $stmt = $db->query("
-                    INSERT INTO products (name, slug, description, price, category_id, image_url, is_featured, is_active, created_at) 
+                    INSERT INTO products (name, slug, description, price, category_id, image_url, is_featured, is_active, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-                ", [$name, $slug, $description, $price, $category_id, $image_url, $is_featured, $is_active]);
-                
+                ", [$name, $slug, $description, $price, $category_id, $file_path, $is_featured, $is_active]);
+
+                if (!$stmt) {
+                    throw new Exception('Erro ao salvar produto no banco de dados.');
+                }
+
                 $success = "Produto adicionado com sucesso!";
             } catch (Exception $e) {
                 $error = "Erro ao adicionar produto: " . $e->getMessage();
@@ -105,7 +209,7 @@ require_once __DIR__ . '/includes/admin-header.php';
         </h5>
     </div>
     <div class="card-body">
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="action" value="add_product">
             
             <div class="row">
@@ -135,11 +239,42 @@ require_once __DIR__ . '/includes/admin-header.php';
                            placeholder="0.00">
                 </div>
                 
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">URL da Imagem</label>
-                    <input type="url" name="image_url" class="form-control" 
-                           placeholder="https://exemplo.com/imagem.jpg">
-                    <small class="text-muted">Cole o link direto da imagem</small>
+                <div class="col-md-12 mb-3">
+                    <label class="form-label">Imagem do Produto</label>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="image_source"
+                                       id="upload_option" value="upload" checked>
+                                <label class="form-check-label" for="upload_option">
+                                    <i class="fas fa-upload me-1"></i>Upload do Computador
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="image_source"
+                                       id="url_option" value="url">
+                                <label class="form-check-label" for="url_option">
+                                    <i class="fas fa-link me-1"></i>URL da Internet
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload File Option -->
+                    <div id="upload_section" class="mt-3">
+                        <input type="file" name="image_file" class="form-control"
+                               accept="image/jpeg,image/png,image/gif,image/webp">
+                        <small class="text-muted">Formatos aceitos: JPG, PNG, GIF, WebP (máx. 5MB)</small>
+                    </div>
+
+                    <!-- URL Option -->
+                    <div id="url_section" class="mt-3" style="display: none;">
+                        <input type="url" name="image_url" class="form-control"
+                               placeholder="https://exemplo.com/imagem.jpg">
+                        <small class="text-muted">Cole o link direto da imagem</small>
+                    </div>
                 </div>
             </div>
             
@@ -285,5 +420,31 @@ require_once __DIR__ . '/includes/admin-header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+// Toggle between upload and URL options
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadOption = document.getElementById('upload_option');
+    const urlOption = document.getElementById('url_option');
+    const uploadSection = document.getElementById('upload_section');
+    const urlSection = document.getElementById('url_section');
+
+    function toggleImageSource() {
+        if (uploadOption.checked) {
+            uploadSection.style.display = 'block';
+            urlSection.style.display = 'none';
+        } else {
+            uploadSection.style.display = 'none';
+            urlSection.style.display = 'block';
+        }
+    }
+
+    uploadOption.addEventListener('change', toggleImageSource);
+    urlOption.addEventListener('change', toggleImageSource);
+
+    // Initialize
+    toggleImageSource();
+});
+</script>
 
 <?php require_once __DIR__ . '/includes/admin-footer.php'; ?>
