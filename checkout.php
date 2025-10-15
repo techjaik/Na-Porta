@@ -293,79 +293,109 @@ if (empty($cartItems)) {
                             <input type="hidden" name="place_order" value="1">
                             
                             <div class="mb-4">
-                                <h6 class="mb-3">
-                                    <i class="fas fa-map-marker-alt me-2"></i>Endereço de Entrega
-                                </h6>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-map-marker-alt me-2"></i>Endereço de Entrega
+                                    </h6>
+                                    <?php if ($user): ?>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleAddressMode()">
+                                        <i class="fas fa-plus me-1"></i>Novo Endereço
+                                    </button>
+                                    <?php endif; ?>
+                                </div>
 
-                                <div class="row">
-                                    <div class="col-md-8 mb-3">
-                                        <label class="form-label">Rua e Número *</label>
-                                        <input type="text" name="street" class="form-control" required
-                                               placeholder="Ex: Rua das Flores, 123">
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <label class="form-label">CEP *</label>
-                                        <input type="text" name="cep" class="form-control" required
-                                               placeholder="00000-000" maxlength="9">
+                                <?php if ($user): ?>
+                                <!-- Saved Addresses Section -->
+                                <div id="savedAddressesSection">
+                                    <div class="mb-3">
+                                        <label class="form-label">Escolha um endereço salvo:</label>
+                                        <div id="savedAddressesList">
+                                            <div class="text-center py-3">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span class="visually-hidden">Carregando endereços...</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Bairro *</label>
-                                        <input type="text" name="neighborhood" class="form-control" required
-                                               placeholder="Ex: Centro">
+                                <!-- Manual Address Section (hidden by default for logged users) -->
+                                <div id="manualAddressSection" style="display: none;">
+                                <?php else: ?>
+                                <!-- Manual Address Section (always visible for anonymous users) -->
+                                <div id="manualAddressSection">
+                                <?php endif; ?>
+                                    <div class="row">
+                                        <div class="col-md-8 mb-3">
+                                            <label class="form-label">Rua e Número *</label>
+                                            <input type="text" name="street" class="form-control" required
+                                                   placeholder="Ex: Rua das Flores, 123">
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">CEP *</label>
+                                            <input type="text" name="cep" class="form-control" required
+                                                   placeholder="00000-000" maxlength="9">
+                                        </div>
                                     </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Complemento</label>
-                                        <input type="text" name="complement" class="form-control"
-                                               placeholder="Ex: Apto 101, Bloco A">
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Bairro *</label>
+                                            <input type="text" name="neighborhood" class="form-control" required
+                                                   placeholder="Ex: Centro">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Complemento</label>
+                                            <input type="text" name="complement" class="form-control"
+                                                   placeholder="Ex: Apto 101, Bloco A">
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-8 mb-3">
+                                            <label class="form-label">Cidade *</label>
+                                            <input type="text" name="city" class="form-control" required
+                                                   placeholder="Ex: São Paulo">
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Estado *</label>
+                                            <select name="state" class="form-control" required>
+                                                <option value="">Selecione...</option>
+                                                <option value="AC">Acre</option>
+                                                <option value="AL">Alagoas</option>
+                                                <option value="AP">Amapá</option>
+                                                <option value="AM">Amazonas</option>
+                                                <option value="BA">Bahia</option>
+                                                <option value="CE">Ceará</option>
+                                                <option value="DF">Distrito Federal</option>
+                                                <option value="ES">Espírito Santo</option>
+                                                <option value="GO">Goiás</option>
+                                                <option value="MA">Maranhão</option>
+                                                <option value="MT">Mato Grosso</option>
+                                                <option value="MS">Mato Grosso do Sul</option>
+                                                <option value="MG">Minas Gerais</option>
+                                                <option value="PA">Pará</option>
+                                                <option value="PB">Paraíba</option>
+                                                <option value="PR">Paraná</option>
+                                                <option value="PE">Pernambuco</option>
+                                                <option value="PI">Piauí</option>
+                                                <option value="RJ">Rio de Janeiro</option>
+                                                <option value="RN">Rio Grande do Norte</option>
+                                                <option value="RS">Rio Grande do Sul</option>
+                                                <option value="RO">Rondônia</option>
+                                                <option value="RR">Roraima</option>
+                                                <option value="SC">Santa Catarina</option>
+                                                <option value="SP" selected>São Paulo</option>
+                                                <option value="SE">Sergipe</option>
+                                                <option value="TO">Tocantins</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="row">
-                                    <div class="col-md-8 mb-3">
-                                        <label class="form-label">Cidade *</label>
-                                        <input type="text" name="city" class="form-control" required
-                                               placeholder="Ex: São Paulo">
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <label class="form-label">Estado *</label>
-                                        <select name="state" class="form-control" required>
-                                            <option value="">Selecione...</option>
-                                            <option value="AC">Acre</option>
-                                            <option value="AL">Alagoas</option>
-                                            <option value="AP">Amapá</option>
-                                            <option value="AM">Amazonas</option>
-                                            <option value="BA">Bahia</option>
-                                            <option value="CE">Ceará</option>
-                                            <option value="DF">Distrito Federal</option>
-                                            <option value="ES">Espírito Santo</option>
-                                            <option value="GO">Goiás</option>
-                                            <option value="MA">Maranhão</option>
-                                            <option value="MT">Mato Grosso</option>
-                                            <option value="MS">Mato Grosso do Sul</option>
-                                            <option value="MG">Minas Gerais</option>
-                                            <option value="PA">Pará</option>
-                                            <option value="PB">Paraíba</option>
-                                            <option value="PR">Paraná</option>
-                                            <option value="PE">Pernambuco</option>
-                                            <option value="PI">Piauí</option>
-                                            <option value="RJ">Rio de Janeiro</option>
-                                            <option value="RN">Rio Grande do Norte</option>
-                                            <option value="RS">Rio Grande do Sul</option>
-                                            <option value="RO">Rondônia</option>
-                                            <option value="RR">Roraima</option>
-                                            <option value="SC">Santa Catarina</option>
-                                            <option value="SP" selected>São Paulo</option>
-                                            <option value="SE">Sergipe</option>
-                                            <option value="TO">Tocantins</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <!-- Hidden field to combine address for database -->
+                                <!-- Hidden fields for selected address -->
                                 <input type="hidden" name="address" id="combined_address">
+                                <input type="hidden" name="selected_address_id" id="selected_address_id">
                             </div>
                             
                             <div class="mb-4">
@@ -522,7 +552,130 @@ if (empty($cartItems)) {
             if (cashOption && cashOption.checked) {
                 cashOption.closest('.payment-option').classList.add('active');
             }
+
+            // Load saved addresses for logged-in users
+            <?php if ($user): ?>
+            loadSavedAddresses();
+            <?php endif; ?>
         });
+
+        <?php if ($user): ?>
+        // Load saved addresses
+        function loadSavedAddresses() {
+            fetch('api/addresses.php?action=list')
+                .then(response => response.json())
+                .then(data => {
+                    const addressesList = document.getElementById('savedAddressesList');
+
+                    if (data.success && data.addresses && data.addresses.length > 0) {
+                        let html = '';
+                        data.addresses.forEach((address, index) => {
+                            const isDefault = address.is_default == 1;
+                            html += `
+                                <div class="form-check address-option mb-2 p-3 border rounded ${isDefault ? 'border-primary bg-light' : ''}">
+                                    <input class="form-check-input" type="radio" name="saved_address"
+                                           value="${address.id}" id="address_${address.id}"
+                                           ${isDefault || index === 0 ? 'checked' : ''}
+                                           onchange="selectSavedAddress(${address.id})">
+                                    <label class="form-check-label w-100" for="address_${address.id}">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong>${address.name}</strong>
+                                                ${isDefault ? '<span class="badge bg-primary ms-2">Padrão</span>' : ''}
+                                                <br>
+                                                <small class="text-muted">
+                                                    ${address.street}, ${address.number}
+                                                    ${address.complement ? ', ' + address.complement : ''}
+                                                    <br>
+                                                    ${address.neighborhood}, ${address.city}/${address.state} - ${address.cep}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            `;
+                        });
+                        addressesList.innerHTML = html;
+
+                        // Auto-select first/default address
+                        const firstAddress = data.addresses.find(addr => addr.is_default == 1) || data.addresses[0];
+                        if (firstAddress) {
+                            selectSavedAddress(firstAddress.id);
+                        }
+                    } else {
+                        addressesList.innerHTML = `
+                            <div class="text-center py-3">
+                                <i class="fas fa-map-marker-alt fa-2x text-muted mb-2"></i>
+                                <p class="text-muted mb-0">Nenhum endereço salvo encontrado</p>
+                                <button type="button" class="btn btn-primary btn-sm mt-2" onclick="toggleAddressMode()">
+                                    <i class="fas fa-plus me-1"></i>Adicionar Endereço
+                                </button>
+                            </div>
+                        `;
+                        // Show manual address form
+                        document.getElementById('manualAddressSection').style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading addresses:', error);
+                    document.getElementById('savedAddressesList').innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Erro ao carregar endereços. Use o formulário abaixo.
+                        </div>
+                    `;
+                    document.getElementById('manualAddressSection').style.display = 'block';
+                });
+        }
+
+        // Select saved address
+        function selectSavedAddress(addressId) {
+            fetch(`api/addresses.php?action=get&id=${addressId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.address) {
+                        const addr = data.address;
+
+                        // Set combined address for form submission
+                        let fullAddress = addr.street + ', ' + addr.number;
+                        if (addr.complement) fullAddress += ', ' + addr.complement;
+                        fullAddress += ', ' + addr.neighborhood;
+                        fullAddress += ', ' + addr.city + ' - ' + addr.state;
+                        fullAddress += ', CEP: ' + addr.cep;
+
+                        document.getElementById('combined_address').value = fullAddress;
+                        document.getElementById('selected_address_id').value = addressId;
+
+                        // Hide manual address form
+                        document.getElementById('manualAddressSection').style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error selecting address:', error);
+                });
+        }
+
+        // Toggle between saved addresses and manual entry
+        function toggleAddressMode() {
+            const manualSection = document.getElementById('manualAddressSection');
+            const savedSection = document.getElementById('savedAddressesSection');
+
+            if (manualSection.style.display === 'none') {
+                manualSection.style.display = 'block';
+                savedSection.style.display = 'none';
+                // Clear selected address
+                document.getElementById('selected_address_id').value = '';
+                // Clear saved address selection
+                document.querySelectorAll('input[name="saved_address"]').forEach(radio => {
+                    radio.checked = false;
+                });
+            } else {
+                manualSection.style.display = 'none';
+                savedSection.style.display = 'block';
+                loadSavedAddresses();
+            }
+        }
+        <?php endif; ?>
     </script>
 </body>
 </html>

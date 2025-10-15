@@ -393,21 +393,139 @@ try {
                 <!-- Addresses Tab -->
                 <div class="tab-pane fade" id="addresses" role="tabpanel">
                     <div class="account-card p-4">
-                        <h5 class="mb-4">
-                            <i class="fas fa-map-marker-alt me-2"></i>Meus Endereços
-                        </h5>
-                        
-                        <div class="text-center py-5">
-                            <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
-                            <h6 class="text-muted">Funcionalidade em desenvolvimento</h6>
-                            <p class="text-muted">Em breve você poderá gerenciar seus endereços de entrega.</p>
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="mb-0">
+                                <i class="fas fa-map-marker-alt me-2"></i>Meus Endereços
+                            </h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAddressModal">
+                                <i class="fas fa-plus me-1"></i>Adicionar Endereço
+                            </button>
+                        </div>
+
+                        <div id="addressesList">
+                            <!-- Addresses will be loaded here -->
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Carregando endereços...</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
-    
+
+    <!-- Add Address Modal -->
+    <div class="modal fade" id="addAddressModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus me-2"></i>Adicionar Endereço
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="addAddressForm">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nome do Endereço *</label>
+                                <input type="text" class="form-control" name="name" required
+                                       placeholder="Ex: Casa, Trabalho, Mãe">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">CEP *</label>
+                                <input type="text" class="form-control" name="cep" required
+                                       placeholder="00000-000" maxlength="9">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label">Rua *</label>
+                                <input type="text" class="form-control" name="street" required
+                                       placeholder="Nome da rua">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Número *</label>
+                                <input type="text" class="form-control" name="number" required
+                                       placeholder="123">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Complemento</label>
+                                <input type="text" class="form-control" name="complement"
+                                       placeholder="Apto, Bloco, etc.">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bairro *</label>
+                                <input type="text" class="form-control" name="neighborhood" required
+                                       placeholder="Nome do bairro">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label">Cidade *</label>
+                                <input type="text" class="form-control" name="city" required
+                                       placeholder="Nome da cidade">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Estado *</label>
+                                <select class="form-control" name="state" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="AC">Acre</option>
+                                    <option value="AL">Alagoas</option>
+                                    <option value="AP">Amapá</option>
+                                    <option value="AM">Amazonas</option>
+                                    <option value="BA">Bahia</option>
+                                    <option value="CE">Ceará</option>
+                                    <option value="DF">Distrito Federal</option>
+                                    <option value="ES">Espírito Santo</option>
+                                    <option value="GO">Goiás</option>
+                                    <option value="MA">Maranhão</option>
+                                    <option value="MT">Mato Grosso</option>
+                                    <option value="MS">Mato Grosso do Sul</option>
+                                    <option value="MG">Minas Gerais</option>
+                                    <option value="PA">Pará</option>
+                                    <option value="PB">Paraíba</option>
+                                    <option value="PR">Paraná</option>
+                                    <option value="PE">Pernambuco</option>
+                                    <option value="PI">Piauí</option>
+                                    <option value="RJ">Rio de Janeiro</option>
+                                    <option value="RN">Rio Grande do Norte</option>
+                                    <option value="RS">Rio Grande do Sul</option>
+                                    <option value="RO">Rondônia</option>
+                                    <option value="RR">Roraima</option>
+                                    <option value="SC">Santa Catarina</option>
+                                    <option value="SP" selected>São Paulo</option>
+                                    <option value="SE">Sergipe</option>
+                                    <option value="TO">Tocantins</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_default" id="isDefault">
+                            <label class="form-check-label" for="isDefault">
+                                Definir como endereço padrão
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Salvar Endereço
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function viewOrder(orderId) {
@@ -439,7 +557,201 @@ try {
         // Load cart count on page load
         document.addEventListener('DOMContentLoaded', function() {
             updateCartCount();
+            loadAddresses();
+
+            // Handle address form submission
+            document.getElementById('addAddressForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const formData = new FormData(this);
+                const addressData = {
+                    action: 'add',
+                    name: formData.get('name'),
+                    cep: formData.get('cep'),
+                    street: formData.get('street'),
+                    number: formData.get('number'),
+                    complement: formData.get('complement'),
+                    neighborhood: formData.get('neighborhood'),
+                    city: formData.get('city'),
+                    state: formData.get('state'),
+                    is_default: formData.get('is_default') ? 1 : 0
+                };
+
+                fetch('api/addresses.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(addressData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Close modal
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('addAddressModal'));
+                        modal.hide();
+
+                        // Reset form
+                        document.getElementById('addAddressForm').reset();
+
+                        // Reload addresses
+                        loadAddresses();
+
+                        showAlert('Endereço adicionado com sucesso!', 'success');
+                    } else {
+                        showAlert(data.message || 'Erro ao adicionar endereço', 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('Erro ao adicionar endereço', 'danger');
+                });
+            });
+
+            // Format CEP input
+            document.querySelector('input[name="cep"]').addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length >= 5) {
+                    value = value.substring(0, 5) + '-' + value.substring(5, 8);
+                }
+                e.target.value = value;
+            });
         });
+
+        // Address Management Functions
+        function loadAddresses() {
+            fetch('api/addresses.php?action=list')
+                .then(response => response.json())
+                .then(data => {
+                    const addressesList = document.getElementById('addressesList');
+
+                    if (data.success && data.addresses && data.addresses.length > 0) {
+                        let html = '';
+                        data.addresses.forEach(address => {
+                            const isDefault = address.is_default == 1;
+                            html += `
+                                <div class="address-card mb-3 p-3 border rounded ${isDefault ? 'border-primary bg-light' : ''}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <h6 class="mb-0 me-2">${address.name}</h6>
+                                                ${isDefault ? '<span class="badge bg-primary">Padrão</span>' : ''}
+                                            </div>
+                                            <p class="mb-1 text-muted">
+                                                ${address.street}, ${address.number}
+                                                ${address.complement ? ', ' + address.complement : ''}
+                                            </p>
+                                            <p class="mb-1 text-muted">
+                                                ${address.neighborhood}, ${address.city}/${address.state}
+                                            </p>
+                                            <p class="mb-0 text-muted">CEP: ${address.cep}</p>
+                                        </div>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                ${!isDefault ? '<li><a class="dropdown-item" href="#" onclick="setDefaultAddress(' + address.id + ')"><i class="fas fa-star me-2"></i>Definir como Padrão</a></li>' : ''}
+                                                <li><a class="dropdown-item" href="#" onclick="editAddress(' + address.id + ')"><i class="fas fa-edit me-2"></i>Editar</a></li>
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteAddress(' + address.id + ')"><i class="fas fa-trash me-2"></i>Excluir</a></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        addressesList.innerHTML = html;
+                    } else {
+                        addressesList.innerHTML = `
+                            <div class="text-center py-5">
+                                <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
+                                <h6 class="text-muted">Nenhum endereço cadastrado</h6>
+                                <p class="text-muted">Adicione seu primeiro endereço para facilitar suas compras.</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading addresses:', error);
+                    document.getElementById('addressesList').innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Erro ao carregar endereços. Tente novamente.
+                        </div>
+                    `;
+                });
+        }
+
+        function setDefaultAddress(addressId) {
+            fetch('api/addresses.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'set_default',
+                    address_id: addressId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadAddresses(); // Reload addresses
+                    showAlert('Endereço padrão definido com sucesso!', 'success');
+                } else {
+                    showAlert(data.message || 'Erro ao definir endereço padrão', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Erro ao definir endereço padrão', 'danger');
+            });
+        }
+
+        function deleteAddress(addressId) {
+            if (confirm('Tem certeza que deseja excluir este endereço?')) {
+                fetch('api/addresses.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'delete',
+                        address_id: addressId
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        loadAddresses(); // Reload addresses
+                        showAlert('Endereço excluído com sucesso!', 'success');
+                    } else {
+                        showAlert(data.message || 'Erro ao excluir endereço', 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('Erro ao excluir endereço', 'danger');
+                });
+            }
+        }
+
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            const container = document.querySelector('.container');
+            container.insertBefore(alertDiv, container.firstChild);
+
+            // Auto dismiss after 5 seconds
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
     </script>
 </body>
 </html>
