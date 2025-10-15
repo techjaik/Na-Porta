@@ -1,6 +1,7 @@
 <?php
 /**
  * Na Porta - Clean Main Website Homepage
+ * Auto-deployment test - if you see this comment, deployment is working!
  */
 
 require_once __DIR__ . '/includes/auth.php';
