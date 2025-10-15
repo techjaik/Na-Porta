@@ -586,7 +586,7 @@ try {
 
                 console.log('Sending address data:', addressData);
 
-                fetch('api/addresses.php', {
+                fetch('simple_address_api.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -653,7 +653,7 @@ try {
 
         // Address Management Functions
         function loadAddresses() {
-            fetch('api/addresses.php?action=list')
+            fetch('simple_address_api.php')
                 .then(response => response.json())
                 .then(data => {
                     const addressesList = document.getElementById('addressesList');
