@@ -19,12 +19,40 @@ require_once __DIR__ . '/../includes/auth.php';
 try {
     $db = Database::getInstance();
     $auth = new Auth();
-    
+
     // Check if user is logged in
     $user = $auth->getCurrentUser();
     if (!$user) {
         echo json_encode(['success' => false, 'message' => 'Usuário não autenticado']);
         exit;
+    }
+
+    // Check if user_addresses table exists, create if not
+    $pdo = $db->getConnection();
+    try {
+        $pdo->query("SELECT 1 FROM user_addresses LIMIT 1");
+    } catch (Exception $e) {
+        // Table doesn't exist, create it
+        $createTableSQL = "
+        CREATE TABLE user_addresses (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            cep VARCHAR(9) NOT NULL,
+            street VARCHAR(200) NOT NULL,
+            number VARCHAR(10) NOT NULL,
+            complement VARCHAR(100),
+            neighborhood VARCHAR(100) NOT NULL,
+            city VARCHAR(100) NOT NULL,
+            state VARCHAR(2) NOT NULL,
+            is_default BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user_id (user_id),
+            INDEX idx_is_default (is_default)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+        $pdo->exec($createTableSQL);
+        error_log("Created user_addresses table");
     }
     
     $userId = $user['id'];
@@ -246,10 +274,16 @@ try {
     }
     
 } catch (Exception $e) {
-    error_log("Address API error: " . $e->getMessage());
+    error_log("Address API error: " . $e->getMessage() . " | File: " . $e->getFile() . " | Line: " . $e->getLine());
+    error_log("Request data: " . print_r($_POST, true) . " | Input: " . file_get_contents('php://input'));
     echo json_encode([
         'success' => false,
-        'message' => 'Erro interno do servidor'
+        'message' => 'Erro interno do servidor: ' . $e->getMessage(),
+        'debug' => [
+            'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ]
     ]);
 }
 ?>
