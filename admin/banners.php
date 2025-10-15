@@ -3,8 +3,19 @@
  * Na Porta - Admin Banners Management
  */
 
-require_once '../includes/auth.php';
-require_once '../config/database.php';
+// Use absolute paths for better compatibility
+$authPath = __DIR__ . '/../includes/auth.php';
+$dbPath = __DIR__ . '/../config/database.php';
+
+if (!file_exists($authPath)) {
+    die('Error: Authentication system not found.');
+}
+if (!file_exists($dbPath)) {
+    die('Error: Database configuration not found.');
+}
+
+require_once $authPath;
+require_once $dbPath;
 
 $auth = new Auth();
 $auth->requireAdmin();
@@ -34,32 +45,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             try {
                 // Handle image upload or URL
-                if ($image_source === 'upload' && isset($_FILES['image_file']) && $_FILES['image_file']['error'] === UPLOAD_ERR_OK) {
+                if ($image_source === 'upload' && isset($_FILES['image_file'])) {
+                    // Check if file was actually uploaded
+                    if (empty($_FILES['image_file']['name'])) {
+                        throw new Exception('Nenhum arquivo foi selecionado para upload.');
+                    }
+
+                    // Check for upload errors
+                    $upload_error = $_FILES['image_file']['error'];
+                    if ($upload_error !== UPLOAD_ERR_OK) {
+                        $error_messages = [
+                            UPLOAD_ERR_INI_SIZE => 'Arquivo muito grande (limite do servidor).',
+                            UPLOAD_ERR_FORM_SIZE => 'Arquivo muito grande (limite do formulário).',
+                            UPLOAD_ERR_PARTIAL => 'Upload incompleto.',
+                            UPLOAD_ERR_NO_FILE => 'Nenhum arquivo selecionado.',
+                            UPLOAD_ERR_NO_TMP_DIR => 'Diretório temporário não encontrado.',
+                            UPLOAD_ERR_CANT_WRITE => 'Erro de escrita no disco.',
+                            UPLOAD_ERR_EXTENSION => 'Upload bloqueado por extensão.'
+                        ];
+                        throw new Exception($error_messages[$upload_error] ?? 'Erro desconhecido no upload.');
+                    }
                     // File upload
-                    $upload_dir = '../uploads/banners/';
+                    $upload_dir = __DIR__ . '/../uploads/banners/';
                     $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
                     $max_size = 5 * 1024 * 1024; // 5MB
+                    
+                    // Create upload directory if it doesn't exist
+                    if (!is_dir($upload_dir)) {
+                        if (!mkdir($upload_dir, 0755, true)) {
+                            throw new Exception('Não foi possível criar o diretório de upload.');
+                        }
+                    }
+                    
+                    // Check if directory is writable
+                    if (!is_writable($upload_dir)) {
+                        throw new Exception('Diretório de upload não tem permissão de escrita.');
+                    }
                     
                     $file_info = $_FILES['image_file'];
                     $file_type = $file_info['type'];
                     $file_size = $file_info['size'];
-                    
+                    $file_tmp_name = $file_info['tmp_name'];
+
+                    // Additional validation for file type using file extension
+                    $file_extension = strtolower(pathinfo($file_info['name'], PATHINFO_EXTENSION));
+                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+                    if (!in_array($file_extension, $allowed_extensions)) {
+                        throw new Exception('Extensão de arquivo não permitida. Use JPG, PNG, GIF ou WebP.');
+                    }
+
                     if (!in_array($file_type, $allowed_types)) {
                         throw new Exception('Tipo de arquivo não permitido. Use JPG, PNG, GIF ou WebP.');
                     }
-                    
+
                     if ($file_size > $max_size) {
                         throw new Exception('Arquivo muito grande. Tamanho máximo: 5MB.');
                     }
-                    
+
+                    // Validate that the uploaded file is actually an image
+                    if (!getimagesize($file_tmp_name)) {
+                        throw new Exception('O arquivo enviado não é uma imagem válida.');
+                    }
+
                     // Generate unique filename
-                    $extension = pathinfo($file_info['name'], PATHINFO_EXTENSION);
-                    $filename = 'banner_' . time() . '_' . uniqid() . '.' . $extension;
+                    $filename = 'banner_' . time() . '_' . uniqid() . '.' . $file_extension;
                     $file_path = 'uploads/banners/' . $filename;
                     $full_path = $upload_dir . $filename;
-                    
-                    if (!move_uploaded_file($file_info['tmp_name'], $full_path)) {
-                        throw new Exception('Erro ao fazer upload do arquivo.');
+
+                    // Attempt to move the uploaded file
+                    if (!move_uploaded_file($file_tmp_name, $full_path)) {
+                        // More detailed error message
+                        $error_details = error_get_last();
+                        $error_msg = 'Erro ao fazer upload do arquivo.';
+                        if ($error_details) {
+                            $error_msg .= ' Detalhes: ' . $error_details['message'];
+                        }
+                        throw new Exception($error_msg);
+                    }
+
+                    // Verify the file was actually created
+                    if (!file_exists($full_path)) {
+                        throw new Exception('Arquivo não foi salvo corretamente no servidor.');
                     }
                 } elseif ($image_source === 'url' && !empty($image_url)) {
                     // URL input
@@ -67,14 +134,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         throw new Exception('URL da imagem inválida.');
                     }
                     $file_path = $image_url;
+                } else {
+                    // No file uploaded and no URL provided
+                    if ($image_source === 'upload') {
+                        throw new Exception('Por favor, selecione um arquivo para upload.');
+                    } else {
+                        throw new Exception('Por favor, forneça uma URL válida para a imagem.');
+                    }
                 }
                 
+                // Ensure we have a file path before inserting
+                if (empty($file_path)) {
+                    throw new Exception('Caminho do arquivo não foi definido corretamente.');
+                }
+
                 // Insert banner
                 $stmt = $db->query("
-                    INSERT INTO promotional_banners (title, description, file_path, file_type, is_active, created_at) 
+                    INSERT INTO promotional_banners (title, description, file_path, file_type, is_active, created_at)
                     VALUES (?, ?, ?, 'image', ?, NOW())
                 ", [$title, $description, $file_path, $is_active]);
-                
+
+                if (!$stmt) {
+                    throw new Exception('Erro ao salvar banner no banco de dados.');
+                }
+
                 $success = "Banner adicionado com sucesso!";
             } catch (Exception $e) {
                 $error = "Erro ao adicionar banner: " . $e->getMessage();
