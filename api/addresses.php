@@ -101,9 +101,15 @@ try {
         }
         
     } elseif ($method === 'POST') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
         $action = $input['action'] ?? '';
-        
+
+        // Debug logging
+        error_log("Address API POST - User ID: $userId, Action: $action");
+        error_log("Address API POST - Raw input: " . $rawInput);
+        error_log("Address API POST - Parsed input: " . json_encode($input));
+
         switch ($action) {
             case 'add':
                 // Add new address
@@ -133,15 +139,17 @@ try {
                 }
                 
                 // Insert new address
-                $addressId = $db->query("
-                    INSERT INTO user_addresses (user_id, name, cep, street, number, complement, neighborhood, city, state, is_default) 
+                $stmt = $db->query("
+                    INSERT INTO user_addresses (user_id, name, cep, street, number, complement, neighborhood, city, state, is_default)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ", [$userId, $name, $cep, $street, $number, $complement, $neighborhood, $city, $state, $isDefault ? 1 : 0]);
-                
+
+                $addressId = $db->lastInsertId();
+
                 echo json_encode([
                     'success' => true,
                     'message' => 'Endereço adicionado com sucesso',
-                    'address_id' => $db->lastInsertId()
+                    'address_id' => $addressId
                 ]);
                 break;
                 

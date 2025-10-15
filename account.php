@@ -563,6 +563,13 @@ try {
             document.getElementById('addAddressForm').addEventListener('submit', function(e) {
                 e.preventDefault();
 
+                // Prevent multiple submissions
+                const submitBtn = this.querySelector('button[type="submit"]');
+                if (submitBtn.disabled) return;
+
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+
                 const formData = new FormData(this);
                 const addressData = {
                     action: 'add',
@@ -577,6 +584,8 @@ try {
                     is_default: formData.get('is_default') ? 1 : 0
                 };
 
+                console.log('Sending address data:', addressData);
+
                 fetch('api/addresses.php', {
                     method: 'POST',
                     headers: {
@@ -584,27 +593,51 @@ try {
                     },
                     body: JSON.stringify(addressData)
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Close modal
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('addAddressModal'));
-                        modal.hide();
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    console.log('Raw response:', text);
+                    try {
+                        const data = JSON.parse(text);
+                        console.log('Parsed response:', data);
 
-                        // Reset form
-                        document.getElementById('addAddressForm').reset();
+                        if (data.success) {
+                            // Close modal
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('addAddressModal'));
+                            modal.hide();
 
-                        // Reload addresses
-                        loadAddresses();
+                            // Reset form
+                            document.getElementById('addAddressForm').reset();
 
-                        showAlert('Endereço adicionado com sucesso!', 'success');
-                    } else {
-                        showAlert(data.message || 'Erro ao adicionar endereço', 'danger');
+                            // Reload addresses
+                            loadAddresses();
+
+                            showAlert('Endereço adicionado com sucesso!', 'success');
+                        } else {
+                            showAlert(data.message || 'Erro ao adicionar endereço', 'danger');
+                            if (data.debug) {
+                                console.error('Debug info:', data.debug);
+                            }
+                        }
+                    } catch (parseError) {
+                        console.error('JSON parse error:', parseError);
+                        console.error('Response text:', text);
+                        showAlert('Erro de resposta do servidor', 'danger');
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    showAlert('Erro ao adicionar endereço', 'danger');
+                    console.error('Fetch error:', error);
+                    showAlert('Erro de conexão: ' + error.message, 'danger');
+                })
+                .finally(() => {
+                    // Re-enable submit button
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Endereço';
                 });
             });
 
