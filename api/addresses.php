@@ -29,30 +29,54 @@ try {
 
     // Check if user_addresses table exists, create if not
     $pdo = $db->getConnection();
-    try {
-        $pdo->query("SELECT 1 FROM user_addresses LIMIT 1");
-    } catch (Exception $e) {
-        // Table doesn't exist, create it
-        $createTableSQL = "
-        CREATE TABLE user_addresses (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NOT NULL,
-            name VARCHAR(100) NOT NULL,
-            cep VARCHAR(9) NOT NULL,
-            street VARCHAR(200) NOT NULL,
-            number VARCHAR(10) NOT NULL,
-            complement VARCHAR(100),
-            neighborhood VARCHAR(100) NOT NULL,
-            city VARCHAR(100) NOT NULL,
-            state VARCHAR(2) NOT NULL,
-            is_default BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_user_id (user_id),
-            INDEX idx_is_default (is_default)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+    $tableExists = false;
 
-        $pdo->exec($createTableSQL);
-        error_log("Created user_addresses table");
+    try {
+        $result = $pdo->query("SELECT 1 FROM user_addresses LIMIT 1");
+        $tableExists = true;
+        error_log("user_addresses table exists");
+    } catch (Exception $e) {
+        error_log("user_addresses table does not exist: " . $e->getMessage());
+
+        // Table doesn't exist, create it
+        try {
+            $createTableSQL = "
+            CREATE TABLE user_addresses (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                cep VARCHAR(9) NOT NULL,
+                street VARCHAR(200) NOT NULL,
+                number VARCHAR(10) NOT NULL,
+                complement VARCHAR(100),
+                neighborhood VARCHAR(100) NOT NULL,
+                city VARCHAR(100) NOT NULL,
+                state VARCHAR(2) NOT NULL,
+                is_default BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_user_id (user_id),
+                INDEX idx_is_default (is_default)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            $pdo->exec($createTableSQL);
+            $tableExists = true;
+            error_log("Successfully created user_addresses table");
+        } catch (Exception $createError) {
+            error_log("Failed to create user_addresses table: " . $createError->getMessage());
+            echo json_encode([
+                'success' => false,
+                'message' => 'Erro ao criar tabela de endereços: ' . $createError->getMessage()
+            ]);
+            exit;
+        }
+    }
+
+    if (!$tableExists) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Tabela de endereços não disponível'
+        ]);
+        exit;
     }
     
     $userId = $user['id'];
