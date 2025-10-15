@@ -31,6 +31,8 @@ jobs:
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
         server-dir: /htdocs/
+        dry-run: false
+        log-level: verbose
         exclude: |
           **/.git*
           **/.git*/**
