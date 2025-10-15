@@ -68,30 +68,66 @@ class Auth {
      */
     public function registerUser($name, $email, $password, $phone = null, $cpf_cnpj = null, $gender = null) {
         try {
-            // Check if email exists
-            $existing = $this->db->fetch("SELECT id FROM users WHERE email = ?", [$email]);
+            // Check if email exists (case-insensitive)
+            $existing = $this->db->fetch("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", [$email]);
             if ($existing) {
-                return false; // Return false instead of throwing exception
+                error_log("Registration failed: Email already exists - " . $email);
+                return false;
             }
-            
+
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-            
-            $sql = "INSERT INTO users (name, email, phone, cpf_cnpj, gender, password, is_active, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, 1, NOW())";
-            
-            $this->db->query($sql, [$name, $email, $phone, $cpf_cnpj, $gender, $hashedPassword]);
-            
+
+            // Get table structure to check which columns exist
+            $pdo = $this->db->getConnection();
+            $stmt = $pdo->query("DESCRIBE users");
+            $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $existingColumns = array_column($columns, 'Field');
+
+            // Build dynamic INSERT query based on existing columns
+            $insertFields = ['name', 'email', 'password'];
+            $insertValues = [$name, $email, $hashedPassword];
+
+            // Add optional fields if they exist in the table
+            $optionalFields = [
+                'phone' => $phone,
+                'cpf_cnpj' => $cpf_cnpj,
+                'gender' => $gender
+            ];
+
+            foreach ($optionalFields as $field => $value) {
+                if (in_array($field, $existingColumns) && $value !== null) {
+                    $insertFields[] = $field;
+                    $insertValues[] = $value;
+                }
+            }
+
+            // Add standard fields if they exist
+            if (in_array('is_active', $existingColumns)) {
+                $insertFields[] = 'is_active';
+                $insertValues[] = 1;
+            }
+
+            if (in_array('created_at', $existingColumns)) {
+                $insertFields[] = 'created_at';
+                $insertValues[] = date('Y-m-d H:i:s');
+            }
+
+            $sql = "INSERT INTO users (" . implode(', ', $insertFields) . ") VALUES (" . str_repeat('?,', count($insertFields) - 1) . "?)";
+
+            $this->db->query($sql, $insertValues);
+
             $userId = $this->db->lastInsertId();
-            
+
             // Auto login after registration
             $_SESSION['user_id'] = $userId;
             $_SESSION['user_name'] = $name;
             $_SESSION['user_email'] = $email;
             $_SESSION['user_phone'] = $phone;
-            
+
+            error_log("Registration successful: User ID $userId, Email: $email");
             return $userId;
         } catch (Exception $e) {
-            error_log("Registration error: " . $e->getMessage());
+            error_log("Registration error: " . $e->getMessage() . " | Email: " . $email);
             return false;
         }
     }
