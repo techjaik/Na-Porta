@@ -3,8 +3,14 @@
  * Na Porta - Clean Admin Login
  */
 
-require_once '../includes/auth.php';
+// Use absolute path for better compatibility
+$authPath = __DIR__ . '/../includes/auth.php';
 
+if (!file_exists($authPath)) {
+    die('Error: Authentication system not found. Please check file paths.');
+}
+
+require_once $authPath;
 $auth = new Auth();
 
 // Redirect if already logged in
