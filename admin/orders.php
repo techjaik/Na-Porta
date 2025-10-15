@@ -1,25 +1,17 @@
 <?php
-// Admin Orders Page
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+/**
+ * Na Porta - Admin Orders Management
+ */
 
-session_start();
+require_once '../includes/auth.php';
 require_once '../config/database.php';
-require_once '../config/config.php';
 
-// Simple admin check
-function is_admin_logged_in() {
-    return isset($_SESSION['admin_id']);
-}
+$auth = new Auth();
+$auth->requireAdmin();
 
-// Redirect if not logged in
-if (!is_admin_logged_in()) {
-    header('Location: login.php');
-    exit();
-}
-
-// Get admin info
-$admin_name = $_SESSION['admin_name'] ?? 'Administrator';
+$db = Database::getInstance();
+$pageTitle = 'Pedidos';
+$pageSubtitle = 'Gerenciar pedidos dos clientes';
 
 $success = '';
 $error = '';
@@ -29,671 +21,494 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     if ($action === 'update_status') {
-        $order_id = (int)($_POST['order_id'] ?? 0);
-        $new_status = $_POST['status'] ?? '';
+        $order_id = intval($_POST['order_id'] ?? 0);
+        $status = $_POST['status'] ?? '';
         
-        if ($order_id > 0 && !empty($new_status)) {
+        if ($order_id > 0 && !empty($status)) {
             try {
-                $stmt = $pdo->prepare("UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?");
-                if ($stmt->execute([$new_status, $order_id])) {
-                    $success = "Status do pedido atualizado com sucesso!";
-                } else {
-                    $error = "Erro ao atualizar status do pedido.";
-                }
+                $db->query("UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?", [$status, $order_id]);
+                $success = "Status do pedido atualizado com sucesso!";
             } catch (Exception $e) {
-                $error = "Erro no banco de dados: " . $e->getMessage();
-            }
-        }
-    }
-    
-    elseif ($action === 'cancel_order') {
-        $order_id = (int)($_POST['order_id'] ?? 0);
-        
-        if ($order_id > 0) {
-            try {
-                // Check if order can be cancelled
-                $stmt = $pdo->prepare("SELECT status FROM orders WHERE id = ?");
-                $stmt->execute([$order_id]);
-                $current_status = $stmt->fetchColumn();
-                
-                if ($current_status && in_array($current_status, ['pending', 'confirmed', 'preparing'])) {
-                    $stmt = $pdo->prepare("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = ?");
-                    if ($stmt->execute([$order_id])) {
-                        $success = "Pedido cancelado com sucesso!";
-                    } else {
-                        $error = "Erro ao cancelar pedido.";
-                    }
-                } else {
-                    $error = "Este pedido não pode ser cancelado.";
-                }
-            } catch (Exception $e) {
-                $error = "Erro no banco de dados: " . $e->getMessage();
+                $error = "Erro ao atualizar status: " . $e->getMessage();
             }
         }
     }
 }
 
-// Get filter parameters
-$status_filter = $_GET['status'] ?? '';
-$payment_filter = $_GET['payment'] ?? '';
-$search = $_GET['search'] ?? '';
+// Get orders with pagination and filtering
+$page = max(1, intval($_GET['page'] ?? 1));
+$limit = 20;
+$offset = ($page - 1) * $limit;
+$statusFilter = $_GET['status'] ?? '';
+$search = trim($_GET['search'] ?? '');
 
-// Get orders from database with filters
 $orders = [];
-$order_stats = ['pending' => 0, 'confirmed' => 0, 'preparing' => 0, 'delivering' => 0, 'delivered' => 0, 'cancelled' => 0];
-
+$totalOrders = 0;
 try {
-    // Build query with filters
-    $where_conditions = [];
+    // Build WHERE clause
+    $whereConditions = [];
     $params = [];
     
-    if (!empty($status_filter)) {
-        $where_conditions[] = "o.status = ?";
-        $params[] = $status_filter;
+    if ($statusFilter) {
+        $whereConditions[] = "o.status = ?";
+        $params[] = $statusFilter;
     }
     
-    if (!empty($payment_filter)) {
-        $where_conditions[] = "o.payment_method = ?";
-        $params[] = $payment_filter;
+    if ($search) {
+        $whereConditions[] = "(u.name LIKE ? OR u.email LIKE ? OR o.id = ? OR o.delivery_address LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+        $params[] = is_numeric($search) ? intval($search) : 0;
+        $params[] = "%$search%";
     }
     
-    if (!empty($search)) {
-        $where_conditions[] = "(o.id LIKE ? OR u.name LIKE ? OR u.email LIKE ?)";
-        $search_param = "%$search%";
-        $params[] = $search_param;
-        $params[] = $search_param;
-        $params[] = $search_param;
-    }
+    $whereClause = $whereConditions ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
     
-    $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+    // Get total count
+    $totalOrders = $db->fetch("
+        SELECT COUNT(DISTINCT o.id) as count 
+        FROM orders o 
+        LEFT JOIN users u ON o.user_id = u.id 
+        $whereClause
+    ", $params)['count'] ?? 0;
     
-    // Get orders with user details
-    $stmt = $pdo->prepare("
+    // Get orders
+    $orders = $db->fetchAll("
         SELECT o.*, u.name as user_name, u.email as user_email,
                COUNT(oi.id) as item_count
         FROM orders o 
         LEFT JOIN users u ON o.user_id = u.id 
         LEFT JOIN order_items oi ON o.id = oi.order_id
-        $where_clause
+        $whereClause
         GROUP BY o.id
-        ORDER BY o.created_at DESC
-    ");
-    $stmt->execute($params);
-    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Get order statistics
-    $stmt = $pdo->prepare("SELECT status, COUNT(*) as count FROM orders GROUP BY status");
-    $stmt->execute();
-    $stats_result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    foreach ($stats_result as $stat) {
-        if (isset($order_stats[$stat['status']])) {
-            $order_stats[$stat['status']] = $stat['count'];
-        }
-    }
+        ORDER BY o.created_at DESC 
+        LIMIT ? OFFSET ?
+    ", array_merge($params, [$limit, $offset]));
     
 } catch (Exception $e) {
     $error = "Erro ao carregar pedidos: " . $e->getMessage();
 }
 
-$page_title = 'Pedidos';
+$totalPages = ceil($totalOrders / $limit);
+
+require_once __DIR__ . '/includes/admin-header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $page_title; ?> - Admin Na Porta</title>
+
+<!-- Success/Error Messages -->
+<?php if ($success): ?>
+    <div class="alert alert-success">
+        <i class="fas fa-check-circle me-2"></i><?= htmlspecialchars($success) ?>
+    </div>
+<?php endif; ?>
+
+<?php if ($error): ?>
+    <div class="alert alert-danger">
+        <i class="fas fa-exclamation-triangle me-2"></i><?= htmlspecialchars($error) ?>
+    </div>
+<?php endif; ?>
+
+<!-- Orders Statistics -->
+<div class="row mb-4">
+    <?php
+    try {
+        $stats = [
+            'pending' => $db->fetch("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'")['count'] ?? 0,
+            'processing' => $db->fetch("SELECT COUNT(*) as count FROM orders WHERE status = 'processing'")['count'] ?? 0,
+            'completed' => $db->fetch("SELECT COUNT(*) as count FROM orders WHERE status = 'completed'")['count'] ?? 0,
+            'cancelled' => $db->fetch("SELECT COUNT(*) as count FROM orders WHERE status = 'cancelled'")['count'] ?? 0,
+        ];
+    } catch (Exception $e) {
+        $stats = ['pending' => 0, 'processing' => 0, 'completed' => 0, 'cancelled' => 0];
+    }
+    ?>
     
-    <!-- MDBootstrap CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.4.2/mdb.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    
-    <style>
-        :root {
-            --primary-color: #1976d2;
-            --sidebar-width: 250px;
-        }
-        
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            width: var(--sidebar-width);
-            background: #2c3e50;
-            color: white;
-            z-index: 1000;
-            overflow-y: auto;
-        }
-        
-        .main-content {
-            margin-left: var(--sidebar-width);
-            min-height: 100vh;
-            background: #f8f9fa;
-        }
-        
-        .sidebar .nav-link {
-            color: #bdc3c7;
-            padding: 12px 20px;
-            border-radius: 0;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar .nav-link:hover,
-        .sidebar .nav-link.active {
-            background: var(--primary-color);
-            color: white;
-        }
-        
-        .navbar-admin {
-            background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-    </style>
-</head>
-<body>
-    <!-- Sidebar -->
-    <nav class="sidebar">
-        <div class="p-3">
-            <h4 class="text-center mb-4">
-                <i class="fas fa-home me-2"></i>Na Porta
-                <small class="d-block text-muted">Admin</small>
-            </h4>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--warning-color), #d97706);">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-number"><?= number_format($stats['pending']) ?></div>
+            <div class="stat-label">Pendentes</div>
         </div>
-        
-        <ul class="nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link" href="index.php">
-                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="products.php">
-                    <i class="fas fa-box me-2"></i>Produtos
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="categories.php">
-                    <i class="fas fa-tags me-2"></i>Categorias
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link active" href="orders.php">
-                    <i class="fas fa-shopping-cart me-2"></i>Pedidos
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="users.php">
-                    <i class="fas fa-users me-2"></i>Usuários
-                </a>
-            </li>
-            <li class="nav-item mt-4">
-                <hr class="text-muted">
-                <a class="nav-link" href="../pages/home-fixed.php" target="_blank">
-                    <i class="fas fa-external-link-alt me-2"></i>Ver Site
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="logout-simple.php">
-                    <i class="fas fa-sign-out-alt me-2"></i>Sair
-                </a>
-            </li>
-        </ul>
-    </nav>
-
-    <!-- Main Content -->
-    <div class="main-content">
-        <!-- Top Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-admin">
-            <div class="container-fluid">
-                <h5 class="mb-0">Gerenciar Pedidos</h5>
-                
-                <div class="navbar-nav ms-auto">
-                    <div class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-mdb-toggle="dropdown">
-                            <i class="fas fa-user-circle me-2"></i><?php echo htmlspecialchars($admin_name); ?>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="logout-simple.php">
-                                <i class="fas fa-sign-out-alt me-2"></i>Sair
-                            </a></li>
-                        </ul>
-                    </div>
-                </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--info-color), #2563eb);">
+                <i class="fas fa-cog"></i>
             </div>
-        </nav>
-
-        <!-- Content -->
-        <div class="container-fluid p-4">
-            <!-- Success/Error Messages -->
-            <?php if ($success): ?>
-            <div class="alert alert-success alert-dismissible fade show">
-                <i class="fas fa-check-circle me-2"></i><?php echo $success; ?>
-                <button type="button" class="btn-close" data-mdb-dismiss="alert"></button>
+            <div class="stat-number"><?= number_format($stats['processing']) ?></div>
+            <div class="stat-label">Processando</div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--success-color), #059669);">
+                <i class="fas fa-check"></i>
             </div>
-            <?php endif; ?>
-            
-            <?php if ($error): ?>
-            <div class="alert alert-danger alert-dismissible fade show">
-                <i class="fas fa-exclamation-circle me-2"></i><?php echo $error; ?>
-                <button type="button" class="btn-close" data-mdb-dismiss="alert"></button>
+            <div class="stat-number"><?= number_format($stats['completed']) ?></div>
+            <div class="stat-label">Concluídos</div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, var(--danger-color), #dc2626);">
+                <i class="fas fa-times"></i>
             </div>
-            <?php endif; ?>
+            <div class="stat-number"><?= number_format($stats['cancelled']) ?></div>
+            <div class="stat-label">Cancelados</div>
+        </div>
+    </div>
+</div>
 
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <h2>Pedidos</h2>
-                    <p class="text-muted">Gerencie todos os pedidos da loja</p>
-                </div>
-                <div class="col-md-6 text-end">
-                    <div class="btn-group">
-                        <button class="btn btn-outline-primary" data-mdb-toggle="collapse" data-mdb-target="#filtersCollapse">
-                            <i class="fas fa-filter me-2"></i>Filtros
-                        </button>
-                        <button class="btn btn-outline-success">
-                            <i class="fas fa-download me-2"></i>Exportar
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Filters -->
-            <div class="collapse mb-4" id="filtersCollapse">
-                <div class="card">
-                    <div class="card-body">
-                        <form method="GET" action="">
-                            <div class="row g-3">
-                                <div class="col-md-3">
-                                    <label class="form-label">Status</label>
-                                    <select class="form-select" name="status">
-                                        <option value="">Todos os status</option>
-                                        <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>Pendente</option>
-                                        <option value="confirmed" <?php echo $status_filter === 'confirmed' ? 'selected' : ''; ?>>Confirmado</option>
-                                        <option value="preparing" <?php echo $status_filter === 'preparing' ? 'selected' : ''; ?>>Preparando</option>
-                                        <option value="delivering" <?php echo $status_filter === 'delivering' ? 'selected' : ''; ?>>Em Entrega</option>
-                                        <option value="delivered" <?php echo $status_filter === 'delivered' ? 'selected' : ''; ?>>Entregue</option>
-                                        <option value="cancelled" <?php echo $status_filter === 'cancelled' ? 'selected' : ''; ?>>Cancelado</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Forma de Pagamento</label>
-                                    <select class="form-select" name="payment">
-                                        <option value="">Todas as formas</option>
-                                        <option value="money" <?php echo $payment_filter === 'money' ? 'selected' : ''; ?>>💰 Dinheiro</option>
-                                        <option value="card" <?php echo $payment_filter === 'card' ? 'selected' : ''; ?>>💳 Cartão</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Buscar</label>
-                                    <input type="text" class="form-control" name="search" 
-                                           placeholder="ID do pedido, nome ou email do cliente..." 
-                                           value="<?php echo htmlspecialchars($search); ?>">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label">&nbsp;</label>
-                                    <div class="d-grid">
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-search me-2"></i>Filtrar
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <?php if (!empty($status_filter) || !empty($payment_filter) || !empty($search)): ?>
-                            <div class="mt-3">
-                                <a href="orders.php" class="btn btn-outline-secondary btn-sm">
-                                    <i class="fas fa-times me-2"></i>Limpar Filtros
-                                </a>
-                            </div>
-                            <?php endif; ?>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Order Stats -->
-            <div class="row g-4 mb-4">
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <div class="bg-warning text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 50px; height: 50px;">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                            <h4 class="mb-0"><?php echo $order_stats['pending']; ?></h4>
-                            <small class="text-muted">Pendentes</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <div class="bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 50px; height: 50px;">
-                                <i class="fas fa-truck"></i>
-                            </div>
-                            <h4 class="mb-0"><?php echo $order_stats['delivering']; ?></h4>
-                            <small class="text-muted">Em Entrega</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 50px; height: 50px;">
-                                <i class="fas fa-check"></i>
-                            </div>
-                            <h4 class="mb-0"><?php echo $order_stats['delivered']; ?></h4>
-                            <small class="text-muted">Entregues</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <div class="bg-danger text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 50px; height: 50px;">
-                                <i class="fas fa-times"></i>
-                            </div>
-                            <h4 class="mb-0"><?php echo $order_stats['cancelled']; ?></h4>
-                            <small class="text-muted">Cancelados</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Orders Table -->
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <?php if (empty($orders)): ?>
-                    <div class="text-center py-5">
-                        <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
-                        <h5>Nenhum pedido encontrado</h5>
-                        <p class="text-muted">
-                            <?php if (!empty($status_filter) || !empty($payment_filter) || !empty($search)): ?>
-                                Nenhum pedido corresponde aos filtros aplicados.
-                            <?php else: ?>
-                                Os pedidos dos clientes aparecerão aqui quando começarem a comprar.
-                            <?php endif; ?>
-                        </p>
-                    </div>
-                    <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Pedido</th>
-                                    <th>Cliente</th>
-                                    <th>Itens</th>
-                                    <th>Total</th>
-                                    <th>Pagamento</th>
-                                    <th>Status</th>
-                                    <th>Data</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($orders as $order): ?>
-                                <tr>
-                                    <td>
-                                        <strong>#<?php echo $order['id']; ?></strong>
-                                    </td>
-                                    <td>
-                                        <div>
-                                            <strong><?php echo htmlspecialchars($order['user_name'] ?? 'Cliente não encontrado'); ?></strong>
-                                            <br>
-                                            <small class="text-muted"><?php echo htmlspecialchars($order['user_email'] ?? ''); ?></small>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-secondary"><?php echo $order['item_count']; ?> item(s)</span>
-                                    </td>
-                                    <td>
-                                        <strong>R$ <?php echo number_format($order['total_amount'], 2, ',', '.'); ?></strong>
-                                    </td>
-                                    <td>
-                                        <?php if ($order['payment_method'] === 'money'): ?>
-                                        <span class="badge bg-success">
-                                            <i class="fas fa-money-bill me-1"></i>Dinheiro
-                                        </span>
-                                        <?php elseif ($order['payment_method'] === 'card'): ?>
-                                        <span class="badge bg-primary">
-                                            <i class="fas fa-credit-card me-1"></i>Cartão
-                                        </span>
-                                        <?php else: ?>
-                                        <span class="badge bg-secondary"><?php echo htmlspecialchars($order['payment_method']); ?></span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php
-                                        $status_colors = [
-                                            'pending' => 'warning',
-                                            'confirmed' => 'info',
-                                            'preparing' => 'primary',
-                                            'delivering' => 'info',
-                                            'delivered' => 'success',
-                                            'cancelled' => 'danger'
-                                        ];
-                                        $status_labels = [
-                                            'pending' => 'Pendente',
-                                            'confirmed' => 'Confirmado',
-                                            'preparing' => 'Preparando',
-                                            'delivering' => 'Em Entrega',
-                                            'delivered' => 'Entregue',
-                                            'cancelled' => 'Cancelado'
-                                        ];
-                                        $color = $status_colors[$order['status']] ?? 'secondary';
-                                        $label = $status_labels[$order['status']] ?? $order['status'];
-                                        ?>
-                                        <span class="badge bg-<?php echo $color; ?>"><?php echo $label; ?></span>
-                                    </td>
-                                    <td>
-                                        <div>
-                                            <?php echo date('d/m/Y', strtotime($order['created_at'])); ?>
-                                            <br>
-                                            <small class="text-muted"><?php echo date('H:i', strtotime($order['created_at'])); ?></small>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-primary" title="Ver detalhes"
-                                                    onclick="viewOrder(<?php echo htmlspecialchars(json_encode($order)); ?>)">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                            <button class="btn btn-outline-warning" title="Alterar status"
-                                                    onclick="updateStatus(<?php echo $order['id']; ?>, '<?php echo $order['status']; ?>')">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <?php if (in_array($order['status'], ['pending', 'confirmed', 'preparing'])): ?>
-                                            <button class="btn btn-outline-danger" title="Cancelar pedido"
-                                                    onclick="cancelOrder(<?php echo $order['id']; ?>)">
-                                                <i class="fas fa-ban"></i>
-                                            </button>
-                                            <?php endif; ?>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+<!-- Orders List -->
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-shopping-cart me-2"></i>Pedidos (<?= number_format($totalOrders) ?>)
+            </h5>
+            <div class="d-flex gap-2">
+                <form method="GET" class="d-flex">
+                    <input type="search" name="search" class="form-control form-control-sm" 
+                           placeholder="Buscar pedidos..." value="<?= htmlspecialchars($search) ?>">
+                    <?php if ($statusFilter): ?>
+                        <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
                     <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- View Order Modal -->
-    <div class="modal fade" id="viewOrderModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="fas fa-shopping-cart me-2"></i>Detalhes do Pedido
-                    </h5>
-                    <button type="button" class="btn-close" data-mdb-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>Informações do Pedido</h6>
-                            <p><strong>ID:</strong> <span id="view_order_id"></span></p>
-                            <p><strong>Status:</strong> <span id="view_order_status"></span></p>
-                            <p><strong>Total:</strong> <span id="view_order_total"></span></p>
-                            <p><strong>Forma de Pagamento:</strong> <span id="view_order_payment"></span></p>
-                            <p><strong>Data:</strong> <span id="view_order_date"></span></p>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Informações do Cliente</h6>
-                            <p><strong>Nome:</strong> <span id="view_customer_name"></span></p>
-                            <p><strong>Email:</strong> <span id="view_customer_email"></span></p>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12">
-                            <h6>Endereço de Entrega</h6>
-                            <p id="view_delivery_address" class="text-muted"></p>
-                        </div>
-                    </div>
-                    <div class="row" id="view_notes_section" style="display: none;">
-                        <div class="col-12">
-                            <h6>Observações</h6>
-                            <p id="view_notes" class="text-muted"></p>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal">
-                        <i class="fas fa-times me-2"></i>Fechar
+                    <button type="submit" class="btn btn-sm btn-outline-primary ms-2">
+                        <i class="fas fa-search"></i>
                     </button>
+                </form>
+                <select class="form-select form-select-sm" onchange="filterOrders(this.value)">
+                    <option value="">Todos os Status</option>
+                    <option value="pending" <?= $statusFilter === 'pending' ? 'selected' : '' ?>>Pendentes</option>
+                    <option value="processing" <?= $statusFilter === 'processing' ? 'selected' : '' ?>>Processando</option>
+                    <option value="shipped" <?= $statusFilter === 'shipped' ? 'selected' : '' ?>>Enviados</option>
+                    <option value="delivered" <?= $statusFilter === 'delivered' ? 'selected' : '' ?>>Entregues</option>
+                    <option value="cancelled" <?= $statusFilter === 'cancelled' ? 'selected' : '' ?>>Cancelados</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <?php if (empty($orders)): ?>
+            <div class="text-center py-5">
+                <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhum pedido encontrado</h5>
+                <p class="text-muted">Os pedidos dos clientes aparecerão aqui.</p>
+            </div>
+        <?php else: ?>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Cliente</th>
+                            <th>Itens</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Data</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($orders as $order): ?>
+                            <tr>
+                                <td><strong>#<?= $order['id'] ?></strong></td>
+                                <td>
+                                    <div>
+                                        <h6 class="mb-1"><?= htmlspecialchars($order['user_name'] ?? 'Cliente') ?></h6>
+                                        <?php if ($order['user_email']): ?>
+                                            <small class="text-muted"><?= htmlspecialchars($order['user_email']) ?></small>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary"><?= $order['item_count'] ?> item(s)</span>
+                                </td>
+                                <td>
+                                    <strong class="text-success">
+                                        R$ <?= number_format($order['total_amount'] ?? 0, 2, ',', '.') ?>
+                                    </strong>
+                                </td>
+                                <td>
+                                    <form method="POST" class="d-inline">
+                                        <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="order_id" value="<?= $order['id'] ?>">
+                                        <select name="status" class="form-select form-select-sm" 
+                                                onchange="this.form.submit()" style="width: auto;">
+                                            <option value="pending" <?= $order['status'] === 'pending' ? 'selected' : '' ?>>
+                                                Pendente
+                                            </option>
+                                            <option value="processing" <?= $order['status'] === 'processing' ? 'selected' : '' ?>>
+                                                Processando
+                                            </option>
+                                            <option value="completed" <?= $order['status'] === 'completed' ? 'selected' : '' ?>>
+                                                Concluído
+                                            </option>
+                                            <option value="cancelled" <?= $order['status'] === 'cancelled' ? 'selected' : '' ?>>
+                                                Cancelado
+                                            </option>
+                                        </select>
+                                    </form>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        <?= date('d/m/Y H:i', strtotime($order['created_at'])) ?>
+                                    </small>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-primary" 
+                                                data-bs-toggle="tooltip" title="Ver Detalhes"
+                                                onclick="viewOrder(<?= $order['id'] ?>)">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-warning" 
+                                                data-bs-toggle="tooltip" title="Editar Pedido"
+                                                onclick="editOrder(<?= $order['id'] ?>)">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-info" 
+                                                data-bs-toggle="tooltip" title="Imprimir"
+                                                onclick="printOrder(<?= $order['id'] ?>)">
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                        <?php if (in_array($order['status'], ['pending', 'cancelled'])): ?>
+                                        <button type="button" class="btn btn-outline-danger" 
+                                                data-bs-toggle="tooltip" title="Excluir Pedido"
+                                                onclick="deleteOrder(<?= $order['id'] ?>)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <?php if ($totalPages > 1): ?>
+                <div class="card-footer">
+                    <nav>
+                        <ul class="pagination pagination-sm justify-content-center mb-0">
+                            <?php if ($page > 1): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=<?= $page - 1 ?>">Anterior</a>
+                                </li>
+                            <?php endif; ?>
+                            
+                            <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                                <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
+                                </li>
+                            <?php endfor; ?>
+                            
+                            <?php if ($page < $totalPages): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=<?= $page + 1 ?>">Próximo</a>
+                                </li>
+                            <?php endif; ?>
+                        </ul>
+                    </nav>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Order Details Modal -->
+<div class="modal fade" id="orderDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-shopping-cart me-2"></i>Detalhes do Pedido
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="orderDetailsContent">
+                <div class="text-center py-4">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Update Status Modal -->
-    <div class="modal fade" id="updateStatusModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form method="POST" action="">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-edit me-2"></i>Alterar Status do Pedido
-                        </h5>
-                        <button type="button" class="btn-close" data-mdb-dismiss="modal"></button>
+<!-- Order Edit Modal -->
+<div class="modal fade" id="orderEditModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Editar Pedido
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="orderEditContent">
+                <div class="text-center py-4">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
                     </div>
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="update_status">
-                        <input type="hidden" name="order_id" id="status_order_id">
-                        
-                        <p>Alterar status do pedido <strong>#<span id="status_order_number"></span></strong>:</p>
-                        
-                        <div class="mb-3">
-                            <label for="status" class="form-label">Novo Status</label>
-                            <select class="form-select" name="status" id="status" required>
-                                <option value="pending">Pendente</option>
-                                <option value="confirmed">Confirmado</option>
-                                <option value="preparing">Preparando</option>
-                                <option value="delivering">Em Entrega</option>
-                                <option value="delivered">Entregue</option>
-                                <option value="cancelled">Cancelado</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal">
-                            <i class="fas fa-times me-2"></i>Cancelar
-                        </button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-2"></i>Atualizar Status
-                        </button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- MDBootstrap JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.4.2/mdb.min.js"></script>
+<script>
+function filterOrders(status) {
+    const url = new URL(window.location);
+    if (status) {
+        url.searchParams.set('status', status);
+    } else {
+        url.searchParams.delete('status');
+    }
+    url.searchParams.delete('page');
+    window.location = url;
+}
+
+function viewOrder(orderId) {
+    const modal = new bootstrap.Modal(document.getElementById('orderDetailsModal'));
+    const content = document.getElementById('orderDetailsContent');
     
-    <script>
-        // View order function
-        function viewOrder(order) {
-            document.getElementById('view_order_id').textContent = '#' + order.id;
-            
-            // Status with color
-            const statusLabels = {
-                'pending': 'Pendente',
-                'confirmed': 'Confirmado',
-                'preparing': 'Preparando',
-                'delivering': 'Em Entrega',
-                'delivered': 'Entregue',
-                'cancelled': 'Cancelado'
-            };
-            const statusColors = {
-                'pending': 'warning',
-                'confirmed': 'info',
-                'preparing': 'primary',
-                'delivering': 'info',
-                'delivered': 'success',
-                'cancelled': 'danger'
-            };
-            const statusLabel = statusLabels[order.status] || order.status;
-            const statusColor = statusColors[order.status] || 'secondary';
-            document.getElementById('view_order_status').innerHTML = 
-                `<span class="badge bg-${statusColor}">${statusLabel}</span>`;
-            
-            document.getElementById('view_order_total').textContent = 
-                'R$ ' + parseFloat(order.total_amount).toLocaleString('pt-BR', {minimumFractionDigits: 2});
-            
-            // Payment method with icon
-            let paymentText = order.payment_method;
-            if (order.payment_method === 'money') {
-                paymentText = '💰 Dinheiro';
-            } else if (order.payment_method === 'card') {
-                paymentText = '💳 Cartão';
-            }
-            document.getElementById('view_order_payment').textContent = paymentText;
-            
-            document.getElementById('view_order_date').textContent = 
-                new Date(order.created_at).toLocaleString('pt-BR');
-            
-            document.getElementById('view_customer_name').textContent = order.user_name || 'Cliente não encontrado';
-            document.getElementById('view_customer_email').textContent = order.user_email || '';
-            
-            document.getElementById('view_delivery_address').textContent = order.delivery_address || '';
-            
-            // Show/hide notes section
-            if (order.notes && order.notes.trim()) {
-                document.getElementById('view_notes').textContent = order.notes;
-                document.getElementById('view_notes_section').style.display = 'block';
+    // Show loading
+    content.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+    
+    // Load order details
+    fetch('ajax/get_order_details.php?id=' + orderId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                content.innerHTML = data.html;
             } else {
-                document.getElementById('view_notes_section').style.display = 'none';
-            }
-            
-            const modal = new mdb.Modal(document.getElementById('viewOrderModal'));
-            modal.show();
-        }
-        
-        // Update status function
-        function updateStatus(orderId, currentStatus) {
-            document.getElementById('order_id').value = orderId;
-            document.getElementById('status').value = currentStatus;
-            
-            const modal = new mdb.Modal(document.getElementById('updateStatusModal'));
-            modal.show();
-        }
-        
-        function cancelOrder(orderId) {
-            if (confirm('Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.')) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.innerHTML = `
-                    <input type="hidden" name="action" value="cancel_order">
-                    <input type="hidden" name="order_id" value="${orderId}">
+                content.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erro ao carregar detalhes: ${data.message}
+                    </div>
                 `;
-                document.body.appendChild(form);
-                form.submit();
             }
+        })
+        .catch(error => {
+            content.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Erro de conexão. Tente novamente.
+                </div>
+            `;
+        });
+}
+
+function editOrder(orderId) {
+    const modal = new bootstrap.Modal(document.getElementById('orderEditModal'));
+    const content = document.getElementById('orderEditContent');
+    
+    // Show loading
+    content.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+    
+    // Load order edit form
+    fetch('ajax/get_order_edit.php?id=' + orderId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                content.innerHTML = data.html;
+            } else {
+                content.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erro ao carregar formulário: ${data.message}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            content.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Erro de conexão. Tente novamente.
+                </div>
+            `;
+        });
+}
+
+function deleteOrder(orderId) {
+    if (!confirm('Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.')) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('order_id', orderId);
+    
+    fetch('ajax/delete_order.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Pedido excluído com sucesso!', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showToast('Erro: ' + data.message, 'error');
         }
-    </script>
-</body>
-</html>
+    })
+    .catch(error => {
+        showToast('Erro de conexão. Tente novamente.', 'error');
+    });
+}
+
+function printOrder(orderId) {
+    // Open order details in a new window for printing
+    const printWindow = window.open(`print_order.php?id=${orderId}`, '_blank', 'width=800,height=600');
+    if (!printWindow) {
+        showToast('Por favor, permita pop-ups para imprimir o pedido', 'warning');
+    }
+}
+
+// Toast notification function
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'error' ? 'danger' : type)} position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check' : (type === 'error' ? 'exclamation-triangle' : 'info')} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+</script>
+
+<?php require_once __DIR__ . '/includes/admin-footer.php'; ?>
