@@ -10,26 +10,37 @@ $auth = new Auth();
 $db = Database::getInstance();
 $user = $auth->getCurrentUser();
 
-// Redirect to login if not authenticated
-if (!$user) {
-    header('Location: auth/login.php?redirect=cart.php');
-    exit();
-}
+// Support both logged-in users and anonymous sessions
+$userId = $user ? $user['id'] : null;
+$sessionId = $userId ? null : session_id();
 
 $cartItems = [];
 $cartTotal = 0;
 
 try {
-    // Get cart items for the user
-    $cartItems = $db->fetchAll("
-        SELECT ci.*, p.name, p.price, p.image, c.name as category_name
-        FROM cart_items ci
-        JOIN products p ON ci.product_id = p.id
-        LEFT JOIN categories c ON p.category_id = c.id
-        WHERE ci.user_id = ? AND p.is_active = 1
-        ORDER BY ci.created_at DESC
-    ", [$user['id']]);
-    
+    // Get cart items for both logged-in users and anonymous sessions
+    if ($userId) {
+        // Logged-in user
+        $cartItems = $db->fetchAll("
+            SELECT ci.*, p.name, p.price, p.image_url as image, c.name as category_name
+            FROM cart_items ci
+            JOIN products p ON ci.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE ci.user_id = ? AND p.is_active = 1
+            ORDER BY ci.created_at DESC
+        ", [$userId]);
+    } else {
+        // Anonymous session
+        $cartItems = $db->fetchAll("
+            SELECT ci.*, p.name, p.price, p.image_url as image, c.name as category_name
+            FROM cart_items ci
+            JOIN products p ON ci.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE ci.session_id = ? AND p.is_active = 1
+            ORDER BY ci.created_at DESC
+        ", [$sessionId]);
+    }
+
     // Calculate total
     foreach ($cartItems as $item) {
         $cartTotal += $item['price'] * $item['quantity'];
@@ -189,17 +200,30 @@ try {
                             </span>
                         </a>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user me-1"></i><?= htmlspecialchars($user['name']) ?>
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="account/profile.php">Meu Perfil</a></li>
-                            <li><a class="dropdown-item" href="account/orders.php">Meus Pedidos</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="auth/logout.php">Sair</a></li>
-                        </ul>
-                    </li>
+                    <?php if ($user): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user me-1"></i><?= htmlspecialchars($user['name']) ?>
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="account/profile.php">Meu Perfil</a></li>
+                                <li><a class="dropdown-item" href="account/orders.php">Meus Pedidos</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="auth/logout.php">Sair</a></li>
+                            </ul>
+                        </li>
+                    <?php else: ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="auth/login.php">
+                                <i class="fas fa-sign-in-alt me-1"></i>Entrar
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="auth/register.php">
+                                <i class="fas fa-user-plus me-1"></i>Cadastrar
+                            </a>
+                        </li>
+                    <?php endif; ?>
                 </ul>
             </div>
         </div>
@@ -444,7 +468,12 @@ try {
         
         // Proceed to checkout
         function proceedToCheckout() {
-            window.location.href = 'checkout.php';
+            <?php if ($user): ?>
+                window.location.href = 'checkout.php';
+            <?php else: ?>
+                // Redirect to login with cart redirect
+                window.location.href = 'auth/login.php?redirect=checkout.php';
+            <?php endif; ?>
         }
         
         // Show toast notification

@@ -182,7 +182,7 @@ function getCart($db, $auth) {
     $whereParam = $userId ?: $sessionId;
     
     $items = $db->fetchAll("
-        SELECT ci.*, p.name, p.price, p.image, p.description,
+        SELECT ci.*, p.name, p.price, p.image_url as image, p.description,
                (ci.quantity * p.price) as subtotal
         FROM cart_items ci
         JOIN products p ON ci.product_id = p.id

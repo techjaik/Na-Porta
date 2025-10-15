@@ -88,7 +88,7 @@ function addToCart(productId, quantity = 1) {
     
     showLoading();
     
-    fetch('/Na%20Porta/api/cart.php', {
+    fetch('api/cart.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -123,7 +123,7 @@ function removeFromCart(productId) {
     
     showLoading();
     
-    fetch('/Na%20Porta/api/cart.php', {
+    fetch('api/cart.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -161,7 +161,7 @@ function removeFromCart(productId) {
 function updateCartQuantity(productId, quantity) {
     if (isLoading || quantity < 1) return;
     
-    fetch('/Na%20Porta/api/cart.php', {
+    fetch('api/cart.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
