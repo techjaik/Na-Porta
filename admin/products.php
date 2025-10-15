@@ -135,6 +135,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name)));
 
+                // Ensure unique slug
+                $original_slug = $slug;
+                $counter = 1;
+                while (true) {
+                    $existing = $db->fetch("SELECT id FROM products WHERE slug = ?", [$slug]);
+                    if (!$existing) {
+                        break; // Slug is unique
+                    }
+                    $slug = $original_slug . '-' . $counter;
+                    $counter++;
+                }
+
                 $stmt = $db->query("
                     INSERT INTO products (name, slug, description, price, category_id, image_url, is_featured, is_active, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())

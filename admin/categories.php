@@ -123,6 +123,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name)));
 
+                // Ensure unique slug
+                $original_slug = $slug;
+                $counter = 1;
+                while (true) {
+                    $existing = $db->fetch("SELECT id FROM categories WHERE slug = ?", [$slug]);
+                    if (!$existing) {
+                        break; // Slug is unique
+                    }
+                    $slug = $original_slug . '-' . $counter;
+                    $counter++;
+                }
+
                 $stmt = $db->query("
                     INSERT INTO categories (name, slug, description, image, is_active, created_at)
                     VALUES (?, ?, ?, ?, ?, NOW())
