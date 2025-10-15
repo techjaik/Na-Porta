@@ -84,8 +84,15 @@ class Database {
             $stmt->execute($params);
             return $stmt;
         } catch (PDOException $e) {
-            error_log("Query failed: " . $e->getMessage() . " SQL: " . $sql);
-            throw new Exception("Erro na consulta ao banco de dados.");
+            $error_msg = "Query failed: " . $e->getMessage() . " SQL: " . $sql . " Params: " . json_encode($params);
+            error_log($error_msg);
+
+            // In development, show more detailed error
+            if (!isset($_SERVER['HTTP_HOST']) || strpos($_SERVER['HTTP_HOST'], '.free.nf') === false) {
+                throw new Exception("Database Error: " . $e->getMessage() . " (SQL: " . substr($sql, 0, 100) . "...)");
+            } else {
+                throw new Exception("Erro na consulta ao banco de dados.");
+            }
         }
     }
     
