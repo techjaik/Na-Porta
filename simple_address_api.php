@@ -14,11 +14,10 @@ if (!isset($_SESSION['user_id'])) {
 
 $userId = $_SESSION['user_id'];
 
-// Simple database connection
-$host = 'sql105.infinityfree.com';
-$database = 'if0_40155099_naporta_db';
-$username = 'if0_40155099';
-$password = 'Jaishreeramm9';
+// Database connection from config
+require_once __DIR__ . '/config/database.php';
+$db = Database::getInstance();
+$pdo = $db->getConnection();
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$database;charset=utf8mb4", $username, $password);

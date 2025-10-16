@@ -15,15 +15,12 @@ $userId = $_SESSION['user_id'];
 $success = '';
 $error = '';
 
-// Simple database connection
-$host = 'sql105.infinityfree.com';
-$database = 'if0_40155099_naporta_db';
-$username = 'if0_40155099';
-$password = 'Jaishreeramm9';
+// Database connection from config
+require_once __DIR__ . '/config/database.php';
+$db = Database::getInstance();
+$pdo = $db->getConnection();
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$database;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // Create tables if they don't exist
     $pdo->exec("
