@@ -12,40 +12,57 @@ $db = Database::getInstance();
 // Get category filter
 $categoryId = intval($_GET['category'] ?? 0);
 $search = trim($_GET['search'] ?? '');
+$page = max(1, intval($_GET['page'] ?? 1));
+$perPage = 12; // Show 12 products per page
+$offset = ($page - 1) * $perPage;
 
 // Get categories for filter
 $categories = [];
 $products = [];
+$totalProducts = 0;
+$totalPages = 1;
+
 try {
     $categories = $db->fetchAll("
-        SELECT * FROM categories 
-        WHERE is_active = 1 
+        SELECT * FROM categories
+        WHERE is_active = 1
         ORDER BY name ASC
     ");
-    
+
     // Build products query
     $whereClause = "WHERE p.is_active = 1";
     $params = [];
-    
+
     if ($categoryId > 0) {
         $whereClause .= " AND p.category_id = ?";
         $params[] = $categoryId;
     }
-    
+
     if ($search) {
         $whereClause .= " AND (p.name LIKE ? OR p.description LIKE ?)";
         $params[] = "%$search%";
         $params[] = "%$search%";
     }
-    
+
+    // Get total count
+    $countResult = $db->fetch("
+        SELECT COUNT(*) as total
+        FROM products p
+        $whereClause
+    ", $params);
+    $totalProducts = $countResult['total'] ?? 0;
+    $totalPages = ceil($totalProducts / $perPage);
+
+    // Get paginated products
     $products = $db->fetchAll("
-        SELECT p.*, c.name as category_name 
-        FROM products p 
-        LEFT JOIN categories c ON p.category_id = c.id 
+        SELECT p.*, c.name as category_name
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
         $whereClause
         ORDER BY p.created_at DESC
-    ", $params);
-    
+        LIMIT ? OFFSET ?
+    ", array_merge($params, [$perPage, $offset]));
+
 } catch (Exception $e) {
     error_log("Products page error: " . $e->getMessage());
 }
@@ -333,6 +350,50 @@ $user = $auth->getCurrentUser();
                                 </div>
                             <?php endforeach; ?>
                         </div>
+
+                        <!-- Pagination -->
+                        <?php if ($totalPages > 1): ?>
+                        <nav aria-label="Page navigation" class="mt-5">
+                            <ul class="pagination justify-content-center">
+                                <?php if ($page > 1): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1<?= $categoryId ? '&category=' . $categoryId : '' ?><?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                            <i class="fas fa-chevron-left me-1"></i>Primeira
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<?= $page - 1 ?><?= $categoryId ? '&category=' . $categoryId : '' ?><?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                            Anterior
+                                        </a>
+                                    </li>
+                                <?php endif; ?>
+
+                                <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                                    <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                                        <a class="page-link" href="?page=<?= $i ?><?= $categoryId ? '&category=' . $categoryId : '' ?><?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                            <?= $i ?>
+                                        </a>
+                                    </li>
+                                <?php endfor; ?>
+
+                                <?php if ($page < $totalPages): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<?= $page + 1 ?><?= $categoryId ? '&category=' . $categoryId : '' ?><?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                            Próxima
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<?= $totalPages ?><?= $categoryId ? '&category=' . $categoryId : '' ?><?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                            Última<i class="fas fa-chevron-right ms-1"></i>
+                                        </a>
+                                    </li>
+                                <?php endif; ?>
+                            </ul>
+                        </nav>
+                        <p class="text-center text-muted">
+                            Página <?= $page ?> de <?= $totalPages ?> (<?= $totalProducts ?> produtos)
+                        </p>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>

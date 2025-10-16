@@ -381,7 +381,7 @@ try {
                 removeFromCart(itemId);
                 return;
             }
-            
+
             fetch('api/cart.php', {
                 method: 'POST',
                 headers: {
@@ -396,7 +396,11 @@ try {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    location.reload(); // Reload to update totals
+                    // Update quantity display without reload
+                    document.getElementById('qty-' + itemId).textContent = quantity;
+                    // Recalculate totals
+                    updateCartTotals();
+                    showToast('Quantidade atualizada!', 'success');
                 } else {
                     showToast(data.message || 'Erro ao atualizar quantidade', 'error');
                 }
@@ -406,13 +410,22 @@ try {
                 showToast('Erro ao atualizar quantidade', 'error');
             });
         }
+
+        // Update cart totals without reload
+        function updateCartTotals() {
+            let total = 0;
+            document.querySelectorAll('[data-item-total]').forEach(el => {
+                total += parseFloat(el.getAttribute('data-item-total')) || 0;
+            });
+            document.getElementById('cart-total').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+        }
         
         // Remove from cart
         function removeFromCart(itemId) {
             if (!confirm('Tem certeza que deseja remover este item?')) {
                 return;
             }
-            
+
             fetch('api/cart.php', {
                 method: 'POST',
                 headers: {
@@ -426,7 +439,18 @@ try {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    location.reload();
+                    // Remove item row without reload
+                    const itemRow = document.getElementById('item-' + itemId);
+                    if (itemRow) {
+                        itemRow.remove();
+                    }
+                    // Update totals
+                    updateCartTotals();
+                    showToast('Item removido!', 'success');
+                    // Check if cart is empty
+                    if (document.querySelectorAll('[id^="item-"]').length === 0) {
+                        location.reload(); // Reload if cart is empty to show empty message
+                    }
                 } else {
                     showToast(data.message || 'Erro ao remover item', 'error');
                 }

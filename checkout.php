@@ -10,36 +10,6 @@ $auth = new Auth();
 $db = Database::getInstance();
 $user = $auth->getCurrentUser();
 
-// Ensure order tables exist
-try {
-    $pdo = $db->getConnection();
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS orders (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NOT NULL,
-            total_amount DECIMAL(10,2) NOT NULL,
-            delivery_address TEXT NOT NULL,
-            payment_method VARCHAR(50) NOT NULL,
-            status VARCHAR(20) DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS order_items (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            order_id INT NOT NULL,
-            product_id INT NOT NULL,
-            quantity INT NOT NULL,
-            price DECIMAL(10,2) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-} catch (Exception $e) {
-    error_log("Error creating order tables: " . $e->getMessage());
-}
-
 // Redirect to login if not authenticated
 if (!$user) {
     header('Location: auth/login.php?redirect=checkout.php');
