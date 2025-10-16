@@ -24,7 +24,7 @@ $password = 'Jaishreeramm9';
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$database;charset=utf8mb4", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
+
     // Create tables if they don't exist
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS orders (
@@ -32,12 +32,16 @@ try {
             user_id INT NOT NULL,
             total_amount DECIMAL(10,2) NOT NULL,
             delivery_address TEXT NOT NULL,
-            payment_method VARCHAR(50) NOT NULL,
+            payment_method VARCHAR(50) NOT NULL DEFAULT 'cash',
             status VARCHAR(20) DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_user_id (user_id),
+            INDEX idx_status (status),
+            INDEX idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
-    
+
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS order_items (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -45,7 +49,10 @@ try {
             product_id INT NOT NULL,
             quantity INT NOT NULL,
             price DECIMAL(10,2) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_order_id (order_id),
+            INDEX idx_product_id (product_id),
+            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
     

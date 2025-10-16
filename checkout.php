@@ -16,6 +16,53 @@ if (!$user) {
     exit();
 }
 
+// Ensure order tables exist (one-time check)
+try {
+    $pdo = $db->getConnection();
+
+    // Check if orders table exists
+    $result = $pdo->query("SHOW TABLES LIKE 'orders'")->fetchAll();
+    if (empty($result)) {
+        // Create orders table
+        $pdo->exec("
+            CREATE TABLE orders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                total_amount DECIMAL(10,2) NOT NULL,
+                delivery_address TEXT NOT NULL,
+                payment_method VARCHAR(50) NOT NULL DEFAULT 'cash',
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_user_id (user_id),
+                INDEX idx_status (status),
+                INDEX idx_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
+
+    // Check if order_items table exists
+    $result = $pdo->query("SHOW TABLES LIKE 'order_items'")->fetchAll();
+    if (empty($result)) {
+        // Create order_items table
+        $pdo->exec("
+            CREATE TABLE order_items (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                order_id INT NOT NULL,
+                product_id INT NOT NULL,
+                quantity INT NOT NULL,
+                price DECIMAL(10,2) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_order_id (order_id),
+                INDEX idx_product_id (product_id),
+                FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
+} catch (Exception $e) {
+    error_log("Error ensuring order tables: " . $e->getMessage());
+}
+
 $success = '';
 $error = '';
 
