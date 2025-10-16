@@ -16,90 +16,45 @@ if (!$user) {
     exit();
 }
 
-// Ensure order tables exist (one-time check)
-try {
-    $pdo = $db->getConnection();
-
-    // Check if orders table exists
-    $result = $pdo->query("SHOW TABLES LIKE 'orders'")->fetchAll();
-    if (empty($result)) {
-        // Create orders table
-        $pdo->exec("
-            CREATE TABLE orders (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                total_amount DECIMAL(10,2) NOT NULL,
-                delivery_address TEXT NOT NULL,
-                payment_method VARCHAR(50) NOT NULL DEFAULT 'cash',
-                status VARCHAR(20) DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                INDEX idx_user_id (user_id),
-                INDEX idx_status (status),
-                INDEX idx_created_at (created_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        ");
-    }
-
-    // Check if order_items table exists
-    $result = $pdo->query("SHOW TABLES LIKE 'order_items'")->fetchAll();
-    if (empty($result)) {
-        // Create order_items table
-        $pdo->exec("
-            CREATE TABLE order_items (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                order_id INT NOT NULL,
-                product_id INT NOT NULL,
-                quantity INT NOT NULL,
-                price DECIMAL(10,2) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_order_id (order_id),
-                INDEX idx_product_id (product_id),
-                FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        ");
-    }
-} catch (Exception $e) {
-    error_log("Error ensuring order tables: " . $e->getMessage());
-}
-
 $success = '';
 $error = '';
 
 // Handle order submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
-    // Get address from multiple possible sources
-    $address = trim($_POST['address'] ?? $_POST['combined_address'] ?? '');
-    $street = trim($_POST['street'] ?? '');
-    $cep = trim($_POST['cep'] ?? '');
-    $neighborhood = trim($_POST['neighborhood'] ?? '');
-    $city = trim($_POST['city'] ?? '');
-    $state = trim($_POST['state'] ?? '');
-    $complement = trim($_POST['complement'] ?? '');
+    try {
+        // Get address - try multiple sources
+        $address = trim($_POST['address'] ?? $_POST['combined_address'] ?? '');
+        $street = trim($_POST['street'] ?? '');
+        $cep = trim($_POST['cep'] ?? '');
+        $neighborhood = trim($_POST['neighborhood'] ?? '');
+        $city = trim($_POST['city'] ?? '');
+        $state = trim($_POST['state'] ?? '');
+        $complement = trim($_POST['complement'] ?? '');
 
-    // If no combined address, build it from individual fields
-    if (empty($address) && !empty($street)) {
-        $address = $street;
-        if (!empty($complement)) $address .= ', ' . $complement;
-        if (!empty($neighborhood)) $address .= ', ' . $neighborhood;
-        if (!empty($city)) $address .= ', ' . $city;
-        if (!empty($state)) $address .= ' - ' . $state;
-        if (!empty($cep)) $address .= ', CEP: ' . $cep;
-    }
+        // Build address if individual fields provided
+        if (empty($address) && !empty($street)) {
+            $address = $street;
+            if (!empty($complement)) $address .= ', ' . $complement;
+            if (!empty($neighborhood)) $address .= ', ' . $neighborhood;
+            if (!empty($city)) $address .= ', ' . $city;
+            if (!empty($state)) $address .= ' - ' . $state;
+            if (!empty($cep)) $address .= ', CEP: ' . $cep;
+        }
 
-    $payment_method = $_POST['payment_method'] ?? 'cash';
+        $payment_method = $_POST['payment_method'] ?? 'dinheiro';
 
-    if (empty($address)) {
-        $error = 'Por favor, preencha o endereço de entrega.';
-    } else {
-        try {
-            // Get cart items for both logged-in users and sessions
-            if ($user) {
+        // Validate address
+        if (empty($address) || strlen($address) < 5) {
+            $error = 'Por favor, preencha um endereço válido.';
+        } else {
+            // Get cart items
+            $cartItems = [];
+            if ($user && !empty($user['id'])) {
                 $cartItems = $db->fetchAll("
                     SELECT ci.*, p.name, p.price
                     FROM cart_items ci
                     JOIN products p ON ci.product_id = p.id
-                    WHERE ci.user_id = ? AND p.is_active = 1
+                    WHERE ci.user_id = ?
                 ", [$user['id']]);
             } else {
                 $sessionId = session_id();
@@ -107,53 +62,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                     SELECT ci.*, p.name, p.price
                     FROM cart_items ci
                     JOIN products p ON ci.product_id = p.id
-                    WHERE ci.session_id = ? AND p.is_active = 1
+                    WHERE ci.session_id = ?
                 ", [$sessionId]);
             }
-            
+
             if (empty($cartItems)) {
                 $error = 'Seu carrinho está vazio.';
             } else {
                 // Calculate total
                 $total = 0;
                 foreach ($cartItems as $item) {
-                    $total += $item['price'] * $item['quantity'];
+                    $total += floatval($item['price']) * intval($item['quantity']);
                 }
-                
+
+                // Ensure tables exist
+                $pdo = $db->getConnection();
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS orders (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        user_id INT NOT NULL,
+                        total_amount DECIMAL(10,2) NOT NULL,
+                        delivery_address TEXT NOT NULL,
+                        payment_method VARCHAR(50) NOT NULL DEFAULT 'dinheiro',
+                        status VARCHAR(20) DEFAULT 'pending',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        INDEX idx_user_id (user_id),
+                        INDEX idx_status (status),
+                        INDEX idx_created_at (created_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                ");
+
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS order_items (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        order_id INT NOT NULL,
+                        product_id INT NOT NULL,
+                        quantity INT NOT NULL,
+                        price DECIMAL(10,2) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_order_id (order_id),
+                        INDEX idx_product_id (product_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                ");
+
                 // Create order
+                $userId = $user && !empty($user['id']) ? $user['id'] : 0;
                 $db->query("
-                    INSERT INTO orders (user_id, total_amount, delivery_address, payment_method, status, created_at) 
-                    VALUES (?, ?, ?, ?, 'pending', NOW())
-                ", [$user['id'], $total, $address, $payment_method]);
-                
+                    INSERT INTO orders (user_id, total_amount, delivery_address, payment_method, status)
+                    VALUES (?, ?, ?, ?, 'pending')
+                ", [$userId, $total, $address, $payment_method]);
+
                 $orderId = $db->lastInsertId();
-                
+
                 // Create order items
                 foreach ($cartItems as $item) {
                     $db->query("
-                        INSERT INTO order_items (order_id, product_id, quantity, price, created_at) 
-                        VALUES (?, ?, ?, ?, NOW())
+                        INSERT INTO order_items (order_id, product_id, quantity, price)
+                        VALUES (?, ?, ?, ?)
                     ", [$orderId, $item['product_id'], $item['quantity'], $item['price']]);
                 }
-                
-                // Clear cart for both user types
-                if ($user) {
+
+                // Clear cart
+                if ($user && !empty($user['id'])) {
                     $db->query("DELETE FROM cart_items WHERE user_id = ?", [$user['id']]);
                 } else {
                     $sessionId = session_id();
                     $db->query("DELETE FROM cart_items WHERE session_id = ?", [$sessionId]);
                 }
-                
-                // Set success message instead of redirect for now
-                $success = "Pedido #$orderId criado com sucesso! Total: R$ " . number_format($total, 2, ',', '.') . " - Endereço: " . $address;
 
-                // Uncomment this line when order-success.php is ready
-                // header('Location: order-success.php?order=' . $orderId);
-                // exit();
+                $success = "✅ Pedido #$orderId criado com sucesso! Total: R$ " . number_format($total, 2, ',', '.');
             }
-        } catch (Exception $e) {
-            $error = 'Erro ao processar pedido: ' . $e->getMessage();
         }
+    } catch (Exception $e) {
+        error_log("Checkout error: " . $e->getMessage());
+        $error = 'Erro ao processar pedido. Por favor, tente novamente.';
     }
 }
 

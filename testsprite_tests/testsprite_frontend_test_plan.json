@@ -1,0 +1,707 @@
+[
+  {
+    "id": "TC001",
+    "title": "Product Catalog Listing and Pagination",
+    "description": "Verify that the product catalog lists products correctly with pagination of 12 items per page and loads within 2.5 seconds (p95).",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to product catalog page"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that 12 products are displayed on the first page"
+      },
+      {
+        "type": "action",
+        "description": "Click to navigate to the next page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify next page shows next 12 products"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure page load time is under 2.5 seconds (p95)"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Category Filtering in Catalog",
+    "description": "Verify products can be filtered by category and corresponding products are displayed correctly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Select a product category filter"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify catalog displays only products from the selected category"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm pagination and item count correspond to filtered result"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Full-Text Search Functionality",
+    "description": "Confirm full-text search by product name or description returns correct product results.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Enter a valid product name keyword in search input"
+      },
+      {
+        "type": "action",
+        "description": "Submit search"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify search results contain products matching the search keyword in name or description"
+      },
+      {
+        "type": "action",
+        "description": "Enter random nonsense keyword in search input"
+      },
+      {
+        "type": "action",
+        "description": "Submit search"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify search returns no results and displays appropriate message"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Add Product to Cart via Cart API",
+    "description": "Validate adding a product to the shopping cart updates cart count within 250ms and shows in UI without page reload.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger add action on Cart API with a valid product_id"
+      },
+      {
+        "type": "assertion",
+        "description": "Check cart count increments by 1 within 250ms"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify cart UI updates via AJAX and no page reload occurs"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Update Cart Item Quantity",
+    "description": "Ensure updating the quantity of an item in the cart reflects the correct quantity and total price without full page reload.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Add a product to the cart first"
+      },
+      {
+        "type": "action",
+        "description": "Trigger update action on Cart API with the item_id and a new quantity"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the cart shows updated quantity and the total price adjusts accordingly"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure UI updates occur without full page reload"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Remove Item from Cart",
+    "description": "Test removing an item from the cart updates the cart count and UI instantly and correctly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Ensure cart has at least one item"
+      },
+      {
+        "type": "action",
+        "description": "Trigger remove action on Cart API with the item_id to remove"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify cart count decreases accordingly and item is removed from cart UI"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no full page reload occurs"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Clear Entire Shopping Cart",
+    "description": "Confirm clearing the cart removes all items and resets cart count to zero with UI update via AJAX.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Add multiple items to the cart"
+      },
+      {
+        "type": "action",
+        "description": "Trigger clear action on Cart API"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify cart count is zero and cart UI is empty"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure immediate UI update with no full page reload"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "User Address Management - Add Address",
+    "description": "Test adding a new delivery address for an authenticated user and verifying it appears in address list.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Authenticate as a user"
+      },
+      {
+        "type": "action",
+        "description": "Send post request to Addresses API with action 'add' and valid address details"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm address is added successfully and appears in subsequent address list"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "User Address Management - Update Address",
+    "description": "Verify updating an existing delivery address changes stored information correctly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Authenticate as user with existing address"
+      },
+      {
+        "type": "action",
+        "description": "Send post request to Addresses API with action 'update' including address_id and new address details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify address data is updated and returned correctly from address list"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "User Address Management - Delete Address",
+    "description": "Ensure that deleting an existing delivery address removes it from the user's address list.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Authenticate as user with existing address"
+      },
+      {
+        "type": "action",
+        "description": "Send post request to Addresses API with action 'delete' and target address_id"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the address no longer appears in address list"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "User Address Management - Set Default Address",
+    "description": "Validate that setting an address as default updates the default address and unsets any previous default.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Authenticate as user with multiple addresses, one default"
+      },
+      {
+        "type": "action",
+        "description": "Send post request to Addresses API with action 'set_default' and the new default address_id"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify exactly one address is marked as default and the change persists on retrieval"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Checkout Process with Cash Payment",
+    "description": "Test completing checkout selecting delivery address, placing order with cash payment, receiving order confirmation with order ID.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Authenticate and add products to cart"
+      },
+      {
+        "type": "action",
+        "description": "Select a delivery address"
+      },
+      {
+        "type": "action",
+        "description": "Place order using cash payment method"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify order is created with corresponding order items and user receives confirmation with unique order ID"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm cart is cleared after successful order placement"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Admin Panel - Product CRUD Operations",
+    "description": "Verify admin can create, read, update, and delete products with validations for unique slugs and image uploads.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin user"
+      },
+      {
+        "type": "action",
+        "description": "Create a new product with valid data including image upload"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm product appears in product list with correct details"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to create a product with a duplicate slug"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify system rejects duplicate slug with error message"
+      },
+      {
+        "type": "action",
+        "description": "Update existing product details and upload new image"
+      },
+      {
+        "type": "assertion",
+        "description": "Check updated product data and image saved and displayed correctly"
+      },
+      {
+        "type": "action",
+        "description": "Delete a product"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify product no longer lists in product catalog"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Admin Panel - Category CRUD with Activation State",
+    "description": "Ensure admin can perform CRUD on categories, enforce unique slugs, and activate/deactivate categories affecting product visibility.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin"
+      },
+      {
+        "type": "action",
+        "description": "Create a new category with unique slug"
+      },
+      {
+        "type": "assertion",
+        "description": "Category appears in listing"
+      },
+      {
+        "type": "action",
+        "description": "Try creating a category with duplicate slug"
+      },
+      {
+        "type": "assertion",
+        "description": "Creation is rejected with validation error"
+      },
+      {
+        "type": "action",
+        "description": "Deactivate a category"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify category products are no longer visible in user catalog"
+      },
+      {
+        "type": "action",
+        "description": "Activate the category back"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify products reappear in catalog"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Admin Panel - Banner CRUD with Image Upload",
+    "description": "Test admin can create, update, delete banners with file upload or URL and validate image formats.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin"
+      },
+      {
+        "type": "action",
+        "description": "Create a banner uploading a valid image file"
+      },
+      {
+        "type": "assertion",
+        "description": "Banner appears in banner list with correct image"
+      },
+      {
+        "type": "action",
+        "description": "Update banner with image by URL"
+      },
+      {
+        "type": "assertion",
+        "description": "Banner updates successfully with new image"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to upload invalid image format"
+      },
+      {
+        "type": "assertion",
+        "description": "Reject banner creation/update with appropriate error"
+      },
+      {
+        "type": "action",
+        "description": "Delete a banner"
+      },
+      {
+        "type": "assertion",
+        "description": "Banner no longer appears in list"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Admin Panel - View and Update Order Status",
+    "description": "Verify admin can view order details and update order status with changes persisted and visible in order list.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin"
+      },
+      {
+        "type": "action",
+        "description": "Fetch order details for a specific order ID via admin AJAX"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify order details payload is received and displayed correctly"
+      },
+      {
+        "type": "action",
+        "description": "Update order status via admin AJAX update endpoint"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm update success response"
+      },
+      {
+        "type": "action",
+        "description": "Reload orders list page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify updated order status is reflected"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Security - Role-Based Admin Access Control",
+    "description": "Verify that admin endpoints are protected by session-based authentication and unauthorized access is denied.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Access admin AJAX endpoints without authentication"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify access is denied with 401 Unauthorized"
+      },
+      {
+        "type": "action",
+        "description": "Authenticate as non-admin user and attempt admin action"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify access denied due to insufficient permissions"
+      },
+      {
+        "type": "action",
+        "description": "Authenticate as admin user and access admin endpoint"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify successful access and correct data returned"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Security - Use of Prepared Statements",
+    "description": "Test that database queries reject injection attempts via user inputs in critical APIs such as Cart and Addresses.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send malformed input with SQL injection payload to Cart API add action"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify input is safely handled, query does not execute maliciously, and no data corruption occurs"
+      },
+      {
+        "type": "action",
+        "description": "Send malformed input with SQL injection payload to Addresses API add/update action"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify input is sanitized and no unauthorized SQL execution happens"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "LGPD Consent Recording and Retrieval",
+    "description": "Validate user consent for LGPD is recorded correctly in session and cookie and retrievable as per compliance.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to LGPD API with consent true"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify API returns 200 OK and consent is recorded in session and cookie"
+      },
+      {
+        "type": "action",
+        "description": "Send POST request to LGPD API with consent false"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify consent value changes accordingly in session and cookie"
+      },
+      {
+        "type": "action",
+        "description": "Request LGPD API with invalid HTTP method"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify server returns 405 Method Not Allowed"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Session Handling for Anonymous and Logged-in User Carts",
+    "description": "Ensure session consistently tracks cart data for anonymous and logged-in users avoiding data loss during navigation and authentication transitions.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Add items to cart as anonymous user"
+      },
+      {
+        "type": "action",
+        "description": "Log in to user account"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify pre-login cart items persist and are merged correctly with user cart"
+      },
+      {
+        "type": "action",
+        "description": "Log out and navigate pages adding items"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify cart persists in anonymous session during browsing"
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Performance - User Page Load Times Under Load",
+    "description": "Monitor product catalog and checkout pages maintain p95 load times under 2.5 seconds under simulated load with 500+ products.",
+    "category": "performance",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate user browsing product catalog with 500+ products"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify 95th percentile of page load times is less than or equal to 2.5 seconds"
+      },
+      {
+        "type": "action",
+        "description": "Simulate checkout process under load"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify responsive UI and backend responses meet timing requirements"
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Performance - Admin Page Load Times and Responsiveness",
+    "description": "Ensure admin pages and AJAX endpoints load and respond within 3 seconds (p95) to facilitate smooth usability.",
+    "category": "performance",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin and navigate through product, category, banner, and order management pages"
+      },
+      {
+        "type": "assertion",
+        "description": "Measure p95 page load times and confirm they are under 3 seconds"
+      },
+      {
+        "type": "action",
+        "description": "Perform CRUD operations triggering AJAX calls"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm AJAX responses complete within performance targets"
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "Localization - Brazilian Portuguese and Currency Formatting",
+    "description": "Validate all user-facing pages including catalog, cart, checkout, and confirmation display content in Brazilian Portuguese with correct currency formatting.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate user pages as a Brazilian Portuguese locale"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all UI text is correctly localized in Brazilian Portuguese"
+      },
+      {
+        "type": "assertion",
+        "description": "Check currency values are formatted correctly as Brazilian Real"
+      }
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "Error Handling - Cart API Invalid Inputs",
+    "description": "Verify that Cart API handles invalid inputs gracefully returning 400 Bad Request and does not corrupt cart data.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send Cart API request with invalid action parameter"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify 400 Bad Request response is returned"
+      },
+      {
+        "type": "action",
+        "description": "Send Cart API add request with missing product_id"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify proper validation error response and cart unchanged"
+      }
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "Error Handling - Addresses API Unauthorized Access",
+    "description": "Confirm that accessing Addresses API actions while not authenticated returns 401 Unauthorized.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt to call Addresses API post endpoints without authentication"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response status is 401 Unauthorized"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to call Addresses API get endpoints with action list or get without authentication"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm 401 Unauthorized response"
+      }
+    ]
+  }
+]

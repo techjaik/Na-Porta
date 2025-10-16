@@ -1,0 +1,357 @@
+{
+  "meta": {
+    "project": "Na Porta",
+    "date": "2025-10-15",
+    "prepared_by": "techjaik"
+  },
+  "product_overview": "Na Porta is a Brazilian last-mile delivery storefront for household essentials, enabling users to browse products, manage shopping carts and delivery addresses, and place cash orders. The platform includes an admin panel for managing products, categories, banners, and orders with performance and usability prioritized for both shoppers and store managers.",
+  "core_goals": [
+    "Provide a simple, reliable, and mobile-first order flow for web shoppers.",
+    "Ensure fast page loads with p95 page load times under 2.5 seconds for user pages and under 3 seconds for admin pages.",
+    "Offer easy-to-use catalog and order management interfaces for administrators.",
+    "Support secure and scalable data handling with proper DB indexing and prepared statements.",
+    "Maintain localization for Brazilian Portuguese, including currency formatting and accessibility standards."
+  ],
+  "key_features": [
+    "Product catalog with listing, pagination (12 items per page), category filtering, and full-text search.",
+    "Shopping cart API supporting add, update, remove, clear actions, with AJAX-based cart updates to reflect changes without full page reloads.",
+    "User account management including profile viewing and CRUD operations for multiple user delivery addresses, with default address support.",
+    "Checkout process supporting cash payment, delivery address selection, order creation with order items, and order confirmation display.",
+    "Admin panel with CRUD operations for products, categories, banners, and orders; image upload support from file or URL; order detail viewing and status updating.",
+    "Compliance with LGPD through user consent recording stored in session and cookie.",
+    "Security features including prepared statements, role-based admin access, and session-based authentication."
+  ],
+  "user_flow_summary": [
+    "Browsing products: Users can browse products by category or search by name/description, view product details, and add items to their shopping cart.",
+    "Cart management: Users add products from the catalog, update item quantities, remove items, or clear the entire cart with immediate UI feedback via AJAX.",
+    "Address management: Authenticated users can add, edit, delete addresses and set one as the default which is auto-selected during checkout.",
+    "Checkout and order placement: Users choose a delivery address, confirm the order summary with total amounts, place an order via cash payment method, and receive an order confirmation displaying the order ID.",
+    "Admin product and order management: Store managers use the admin panel to create, update, activate/deactivate products and categories, manage banners, view paginated orders, and update order statuses."
+  ],
+  "validation_criteria": [
+    "Add to cart actions update the cart counter within 250ms and reflect changes without full page reload.",
+    "Product catalog pages load within 2.5 seconds (p95) under typical hosting with over 500 products.",
+    "Checkout process reliably creates orders with corresponding order items and clears the cart upon success; users receive confirmation with order ID.",
+    "User address operations enforce one default address per user and maintain data integrity during add, update, delete, and default setting actions.",
+    "Admin actions such as CRUD for products, categories, and banners enforce unique slugs, validate image uploads, and respect activation states.",
+    "Security measures such as prepared statements and role-based access control prevent unauthorized data access and actions.",
+    "Sessions consistently track anonymous and logged-in user carts to avoid data loss.",
+    "LGPD consent is recorded and retrievable in compliance with Brazil’s data protection requirements.",
+    "Performance metrics for page load times and server response adhere to defined targets to ensure smooth UX both on user-facing and admin interfaces."
+  ],
+  "code_summary": {
+    "tech_stack": [
+      "PHP",
+      "MySQL",
+      "JavaScript",
+      "MDBootstrap"
+    ],
+    "features": [
+      {
+        "name": "Cart API",
+        "description": "Manage shopping cart: add, update, remove items; get cart and count; clear cart.",
+        "files": [
+          "api/cart.php"
+        ],
+        "api_doc": {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Cart API",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/api/cart.php": {
+              "post": {
+                "summary": "Perform cart actions",
+                "requestBody": {
+                  "required": true,
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "add",
+                              "update",
+                              "remove",
+                              "get",
+                              "count",
+                              "clear"
+                            ]
+                          },
+                          "product_id": {
+                            "type": "integer"
+                          },
+                          "item_id": {
+                            "type": "integer"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "action"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "responses": {
+                  "200": {
+                    "description": "OK"
+                  },
+                  "400": {
+                    "description": "Bad Request"
+                  }
+                }
+              },
+              "get": {
+                "summary": "Get cart data via action query",
+                "parameters": [
+                  {
+                    "name": "action",
+                    "in": "query",
+                    "required": true,
+                    "schema": {
+                      "type": "string",
+                      "enum": [
+                        "get",
+                        "count"
+                      ]
+                    }
+                  }
+                ],
+                "responses": {
+                  "200": {
+                    "description": "OK"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "User Addresses API",
+        "description": "CRUD for authenticated user addresses with default address management and auto table creation.",
+        "files": [
+          "api/addresses.php"
+        ],
+        "api_doc": {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Addresses API",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/api/addresses.php": {
+              "get": {
+                "summary": "List or get address",
+                "parameters": [
+                  {
+                    "name": "action",
+                    "in": "query",
+                    "required": true,
+                    "schema": {
+                      "type": "string",
+                      "enum": [
+                        "list",
+                        "get"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "id",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                      "type": "integer"
+                    }
+                  }
+                ],
+                "responses": {
+                  "200": {
+                    "description": "OK"
+                  },
+                  "401": {
+                    "description": "Unauthorized"
+                  }
+                }
+              },
+              "post": {
+                "summary": "Add/update/delete/set_default address",
+                "requestBody": {
+                  "required": true,
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "add",
+                              "update",
+                              "delete",
+                              "set_default"
+                            ]
+                          },
+                          "address_id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "cep": {
+                            "type": "string"
+                          },
+                          "street": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "string"
+                          },
+                          "complement": {
+                            "type": "string"
+                          },
+                          "neighborhood": {
+                            "type": "string"
+                          },
+                          "city": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "is_default": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "action"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "responses": {
+                  "200": {
+                    "description": "OK"
+                  },
+                  "401": {
+                    "description": "Unauthorized"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "LGPD Consent API",
+        "description": "Record user consent for LGPD (Brazilian data protection) in session and cookie.",
+        "files": [
+          "api/lgpd.php"
+        ],
+        "api_doc": {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "LGPD API",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/api/lgpd.php": {
+              "post": {
+                "summary": "Set LGPD consent",
+                "requestBody": {
+                  "required": true,
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "consent": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "consent"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "responses": {
+                  "200": {
+                    "description": "OK"
+                  },
+                  "405": {
+                    "description": "Method Not Allowed"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "Admin Orders AJAX",
+        "description": "Admin-protected endpoints to fetch and update order details.",
+        "files": [
+          "admin/ajax/get_order_details.php",
+          "admin/ajax/update_order.php"
+        ],
+        "api_doc": {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Admin Orders AJAX",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/admin/ajax/get_order_details.php": {
+              "get": {
+                "summary": "Get order details (HTML payload)",
+                "parameters": [
+                  {
+                    "name": "id",
+                    "in": "query",
+                    "required": true,
+                    "schema": {
+                      "type": "integer"
+                    }
+                  }
+                ],
+                "responses": {
+                  "200": {
+                    "description": "OK"
+                  },
+                  "401": {
+                    "description": "Unauthorized"
+                  }
+                }
+              }
+            },
+            "/admin/ajax/update_order.php": {
+              "post": {
+                "summary": "Update order",
+                "requestBody": {
+                  "required": true
+                },
+                "responses": {
+                  "200": {
+                    "description": "OK"
+                  },
+                  "401": {
+                    "description": "Unauthorized"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

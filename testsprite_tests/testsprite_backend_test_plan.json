@@ -1,0 +1,37 @@
+[
+  {
+    "id": "TC001",
+    "title": "test_add_update_remove_clear_cart_actions",
+    "description": "Verify that the cart API correctly handles add, update, remove, and clear actions, updating the cart contents and count accordingly without full page reload."
+  },
+  {
+    "id": "TC002",
+    "title": "test_get_cart_and_count_via_get_request",
+    "description": "Verify that the cart API returns correct cart data and item count when accessed via GET requests with action parameters 'get' and 'count'."
+  },
+  {
+    "id": "TC003",
+    "title": "test_user_address_crud_operations",
+    "description": "Verify that authenticated users can perform CRUD operations on their delivery addresses, including adding, updating, deleting, and setting a default address, with data integrity maintained."
+  },
+  {
+    "id": "TC004",
+    "title": "test_list_and_get_address_via_get_request",
+    "description": "Verify that the addresses API returns the list of user addresses or a specific address when requested via GET with appropriate action and id parameters."
+  },
+  {
+    "id": "TC005",
+    "title": "test_lgpd_consent_recording",
+    "description": "Verify that the LGPD API correctly records user consent in session and cookie when a POST request with consent boolean is made."
+  },
+  {
+    "id": "TC006",
+    "title": "test_admin_get_order_details_authorization",
+    "description": "Verify that the admin AJAX endpoint for getting order details returns order HTML details for authorized users and returns 401 Unauthorized for unauthorized access."
+  },
+  {
+    "id": "TC007",
+    "title": "test_admin_update_order_authorization",
+    "description": "Verify that the admin AJAX endpoint for updating orders processes valid update requests for authorized users and returns 401 Unauthorized for unauthorized access."
+  }
+]
