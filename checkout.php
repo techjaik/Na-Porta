@@ -75,67 +75,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                     $total += floatval($item['price']) * intval($item['quantity']);
                 }
 
-                // Ensure tables exist
+                // Ensure tables exist with proper error handling
                 $pdo = $db->getConnection();
-                $pdo->exec("
-                    CREATE TABLE IF NOT EXISTS orders (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        user_id INT NOT NULL,
-                        total_amount DECIMAL(10,2) NOT NULL,
-                        delivery_address TEXT NOT NULL,
-                        payment_method VARCHAR(50) NOT NULL DEFAULT 'dinheiro',
-                        status VARCHAR(20) DEFAULT 'pending',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                        INDEX idx_user_id (user_id),
-                        INDEX idx_status (status),
-                        INDEX idx_created_at (created_at)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                ");
 
-                $pdo->exec("
-                    CREATE TABLE IF NOT EXISTS order_items (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        order_id INT NOT NULL,
-                        product_id INT NOT NULL,
-                        quantity INT NOT NULL,
-                        price DECIMAL(10,2) NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        INDEX idx_order_id (order_id),
-                        INDEX idx_product_id (product_id)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                ");
+                try {
+                    $pdo->exec("
+                        CREATE TABLE IF NOT EXISTS orders (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            user_id INT NOT NULL,
+                            total_amount DECIMAL(10,2) NOT NULL,
+                            delivery_address TEXT NOT NULL,
+                            payment_method VARCHAR(50) NOT NULL DEFAULT 'dinheiro',
+                            status VARCHAR(20) DEFAULT 'pending',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            INDEX idx_user_id (user_id),
+                            INDEX idx_status (status),
+                            INDEX idx_created_at (created_at)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    ");
+                } catch (Exception $tableError) {
+                    error_log("Error creating orders table: " . $tableError->getMessage());
+                }
 
-                // Create order
-                $userId = $user && !empty($user['id']) ? $user['id'] : 0;
-                $db->query("
-                    INSERT INTO orders (user_id, total_amount, delivery_address, payment_method, status)
-                    VALUES (?, ?, ?, ?, 'pending')
-                ", [$userId, $total, $address, $payment_method]);
+                try {
+                    $pdo->exec("
+                        CREATE TABLE IF NOT EXISTS order_items (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            order_id INT NOT NULL,
+                            product_id INT NOT NULL,
+                            quantity INT NOT NULL,
+                            price DECIMAL(10,2) NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            INDEX idx_order_id (order_id),
+                            INDEX idx_product_id (product_id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    ");
+                } catch (Exception $tableError) {
+                    error_log("Error creating order_items table: " . $tableError->getMessage());
+                }
 
-                $orderId = $db->lastInsertId();
+                // Create order with transaction
+                try {
+                    $pdo->beginTransaction();
 
-                // Create order items
-                foreach ($cartItems as $item) {
+                    $userId = $user && !empty($user['id']) ? $user['id'] : 0;
                     $db->query("
-                        INSERT INTO order_items (order_id, product_id, quantity, price)
-                        VALUES (?, ?, ?, ?)
-                    ", [$orderId, $item['product_id'], $item['quantity'], $item['price']]);
-                }
+                        INSERT INTO orders (user_id, total_amount, delivery_address, payment_method, status)
+                        VALUES (?, ?, ?, ?, 'pending')
+                    ", [$userId, $total, $address, $payment_method]);
 
-                // Clear cart
-                if ($user && !empty($user['id'])) {
-                    $db->query("DELETE FROM cart_items WHERE user_id = ?", [$user['id']]);
-                } else {
-                    $sessionId = session_id();
-                    $db->query("DELETE FROM cart_items WHERE session_id = ?", [$sessionId]);
-                }
+                    $orderId = $db->lastInsertId();
 
-                $success = "✅ Pedido #$orderId criado com sucesso! Total: R$ " . number_format($total, 2, ',', '.');
+                    // Create order items
+                    foreach ($cartItems as $item) {
+                        $db->query("
+                            INSERT INTO order_items (order_id, product_id, quantity, price)
+                            VALUES (?, ?, ?, ?)
+                        ", [$orderId, $item['product_id'], $item['quantity'], $item['price']]);
+                    }
+
+                    // Clear cart
+                    if ($user && !empty($user['id'])) {
+                        $db->query("DELETE FROM cart_items WHERE user_id = ?", [$user['id']]);
+                    } else {
+                        $sessionId = session_id();
+                        $db->query("DELETE FROM cart_items WHERE session_id = ?", [$sessionId]);
+                    }
+
+                    $pdo->commit();
+                    $success = "✅ Pedido #$orderId criado com sucesso! Total: R$ " . number_format($total, 2, ',', '.');
+
+                } catch (Exception $orderError) {
+                    $pdo->rollback();
+                    error_log("Error creating order: " . $orderError->getMessage());
+                    $error = 'Erro ao processar pedido. Por favor, tente novamente.';
+                }
             }
         }
     } catch (Exception $e) {
-        error_log("Checkout error: " . $e->getMessage());
+        error_log("Checkout error: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
         $error = 'Erro ao processar pedido. Por favor, tente novamente.';
     }
 }
