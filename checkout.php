@@ -386,7 +386,7 @@ if (empty($cartItems)) {
                                 <!-- Saved Addresses Section -->
                                 <div id="savedAddressesSection">
                                     <div class="mb-3">
-                                        <label class="form-label">Escolha um endereço salvo:</label>
+                                        <label for="savedAddressesList" class="form-label">Escolha um endereço salvo:</label>
                                         <div id="savedAddressesList">
                                             <div class="text-center py-3">
                                                 <div class="spinner-border spinner-border-sm text-primary" role="status">
@@ -405,39 +405,39 @@ if (empty($cartItems)) {
                                 <?php endif; ?>
                                     <div class="row">
                                         <div class="col-md-8 mb-3">
-                                            <label class="form-label">Rua e Número *</label>
-                                            <input type="text" name="street" class="form-control address-field"
+                                            <label for="street" class="form-label">Rua e Número *</label>
+                                            <input type="text" name="street" id="street" class="form-control address-field"
                                                    placeholder="Ex: Rua das Flores, 123">
                                         </div>
                                         <div class="col-md-4 mb-3">
-                                            <label class="form-label">CEP *</label>
-                                            <input type="text" name="cep" class="form-control address-field"
+                                            <label for="cep" class="form-label">CEP *</label>
+                                            <input type="text" name="cep" id="cep" class="form-control address-field"
                                                    placeholder="00000-000" maxlength="9">
                                         </div>
                                     </div>
 
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Bairro *</label>
-                                            <input type="text" name="neighborhood" class="form-control address-field"
+                                            <label for="neighborhood" class="form-label">Bairro *</label>
+                                            <input type="text" name="neighborhood" id="neighborhood" class="form-control address-field"
                                                    placeholder="Ex: Centro">
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Complemento</label>
-                                            <input type="text" name="complement" class="form-control"
+                                            <label for="complement" class="form-label">Complemento</label>
+                                            <input type="text" name="complement" id="complement" class="form-control"
                                                    placeholder="Ex: Apto 101, Bloco A">
                                         </div>
                                     </div>
 
                                     <div class="row">
                                         <div class="col-md-8 mb-3">
-                                            <label class="form-label">Cidade *</label>
-                                            <input type="text" name="city" class="form-control address-field"
+                                            <label for="city" class="form-label">Cidade *</label>
+                                            <input type="text" name="city" id="city" class="form-control address-field"
                                                    placeholder="Ex: São Paulo">
                                         </div>
                                         <div class="col-md-4 mb-3">
-                                            <label class="form-label">Estado *</label>
-                                            <select name="state" class="form-control address-field">
+                                            <label for="state" class="form-label">Estado *</label>
+                                            <select name="state" id="state" class="form-control address-field">
                                                 <option value="">Selecione...</option>
                                                 <option value="AC">Acre</option>
                                                 <option value="AL">Alagoas</option>
@@ -477,8 +477,8 @@ if (empty($cartItems)) {
                             </div>
                             
                             <div class="mb-4">
-                                <label class="form-label">Forma de Pagamento *</label>
-                                <div class="payment-methods">
+                                <label for="payment_methods" class="form-label">Forma de Pagamento *</label>
+                                <div class="payment-methods" id="payment_methods">
                                     <div class="form-check payment-option recommended">
                                         <input class="form-check-input" type="radio" name="payment_method"
                                                value="dinheiro" id="dinheiro" required checked>
@@ -633,7 +633,14 @@ if (empty($cartItems)) {
 
             // Load saved addresses for logged-in users
             <?php if ($user): ?>
-            loadSavedAddresses();
+            try {
+                loadSavedAddresses();
+            } catch (error) {
+                console.log('Failed to load saved addresses:', error);
+                // Hide saved addresses section if API fails
+                document.getElementById('savedAddressesSection').style.display = 'none';
+                document.getElementById('manualAddressSection').style.display = 'block';
+            }
             <?php endif; ?>
         });
 
@@ -641,7 +648,12 @@ if (empty($cartItems)) {
         // Load saved addresses
         function loadSavedAddresses() {
             fetch('api/addresses.php?action=list')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     const addressesList = document.getElementById('savedAddressesList');
 
