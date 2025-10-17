@@ -405,12 +405,12 @@ if (empty($cartItems)) {
                                     <div class="row">
                                         <div class="col-md-8 mb-3">
                                             <label class="form-label">Rua e Número *</label>
-                                            <input type="text" name="street" class="form-control" required
+                                            <input type="text" name="street" class="form-control address-field"
                                                    placeholder="Ex: Rua das Flores, 123">
                                         </div>
                                         <div class="col-md-4 mb-3">
                                             <label class="form-label">CEP *</label>
-                                            <input type="text" name="cep" class="form-control" required
+                                            <input type="text" name="cep" class="form-control address-field"
                                                    placeholder="00000-000" maxlength="9">
                                         </div>
                                     </div>
@@ -418,7 +418,7 @@ if (empty($cartItems)) {
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label">Bairro *</label>
-                                            <input type="text" name="neighborhood" class="form-control" required
+                                            <input type="text" name="neighborhood" class="form-control address-field"
                                                    placeholder="Ex: Centro">
                                         </div>
                                         <div class="col-md-6 mb-3">
@@ -431,12 +431,12 @@ if (empty($cartItems)) {
                                     <div class="row">
                                         <div class="col-md-8 mb-3">
                                             <label class="form-label">Cidade *</label>
-                                            <input type="text" name="city" class="form-control" required
+                                            <input type="text" name="city" class="form-control address-field"
                                                    placeholder="Ex: São Paulo">
                                         </div>
                                         <div class="col-md-4 mb-3">
                                             <label class="form-label">Estado *</label>
-                                            <select name="state" class="form-control" required>
+                                            <select name="state" class="form-control address-field">
                                                 <option value="">Selecione...</option>
                                                 <option value="AC">Acre</option>
                                                 <option value="AL">Alagoas</option>
@@ -753,6 +753,45 @@ if (empty($cartItems)) {
             }
         }
         <?php endif; ?>
+
+        // Form validation - handle required fields based on visibility
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const manualSection = document.getElementById('manualAddressSection');
+            const isManualMode = manualSection.style.display !== 'none';
+            const combinedAddress = document.getElementById('combined_address').value;
+            const selectedAddressId = document.getElementById('selected_address_id').value;
+
+            // If using saved address, don't require manual fields
+            if (!isManualMode && (combinedAddress || selectedAddressId)) {
+                // Remove required attribute from manual fields
+                document.querySelectorAll('.address-field').forEach(field => {
+                    field.removeAttribute('required');
+                });
+                return true;
+            }
+
+            // If using manual entry, require manual fields
+            if (isManualMode) {
+                document.querySelectorAll('.address-field').forEach(field => {
+                    field.setAttribute('required', 'required');
+                });
+
+                // Validate manually
+                const street = document.querySelector('input[name="street"]').value.trim();
+                const cep = document.querySelector('input[name="cep"]').value.trim();
+                const neighborhood = document.querySelector('input[name="neighborhood"]').value.trim();
+                const city = document.querySelector('input[name="city"]').value.trim();
+                const state = document.querySelector('select[name="state"]').value.trim();
+
+                if (!street || !cep || !neighborhood || !city || !state) {
+                    alert('Por favor, preencha todos os campos de endereço.');
+                    e.preventDefault();
+                    return false;
+                }
+            }
+
+            return true;
+        });
     </script>
 </body>
 </html>
