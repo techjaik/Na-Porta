@@ -10,11 +10,8 @@ $auth = new Auth();
 $db = Database::getInstance();
 $user = $auth->getCurrentUser();
 
-// Redirect to login if not authenticated
-if (!$user) {
-    header('Location: auth/login.php?redirect=checkout.php');
-    exit();
-}
+// Allow both authenticated and anonymous checkout
+// If not authenticated, we'll use session-based cart
 
 $success = '';
 $error = '';
@@ -319,7 +316,11 @@ if (empty($cartItems)) {
             
             <div class="navbar-nav ms-auto">
                 <span class="navbar-text">
-                    <i class="fas fa-user me-1"></i><?= htmlspecialchars($user['name']) ?>
+                    <?php if ($user): ?>
+                        <i class="fas fa-user me-1"></i><?= htmlspecialchars($user['name']) ?>
+                    <?php else: ?>
+                        <i class="fas fa-shopping-cart me-1"></i>Checkout Anônimo
+                    <?php endif; ?>
                 </span>
             </div>
         </div>
